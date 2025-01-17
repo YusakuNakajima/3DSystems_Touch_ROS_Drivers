@@ -39,7 +39,9 @@ Do you want to run TouchCheckup for connection test? (OpenHaptics setup is inclu
 
 ## Launch ROS Node
 
-Clone and build this repository.
+After installing the device driver and building the workspace, you can launch the ROS node.
+This launch file will start the ROS node and publish the data from the haptic device.
+You can read data from the haptic device and write force feedback to the device.
 ```bash
 roslaunch omni_common omni_state.launch
 ```
@@ -55,6 +57,12 @@ Data from the haptic device can be read from the following topics:
   /phantom/pose
   
   /phantom/state
+
+With RViz visualization launch is as follows:
+```bash
+roslaunch omni_common omni.launch
+```
+
 
 ## Use Multiple Devices
 
