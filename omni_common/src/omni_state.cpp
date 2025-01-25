@@ -69,57 +69,56 @@ public:
   ros::Publisher button_publisher;
   ros::Publisher joint_publisher;
   ros::Subscriber haptic_sub;
-  std::string omni_name, ref_frame, units, robot_description_name;
+  std::string prefix, ref_frame, units, robot_description_name;
 
   OmniState *state;
 
   void init(OmniState *s) {
-    ros::param::param(std::string("~omni_name"), omni_name, std::string("phantom"));
+    ros::param::param(std::string("~prefix"), prefix, std::string("phantom"));
     ros::param::param(std::string("~reference_frame"), ref_frame, std::string("base"));
     ros::param::param(std::string("~units"), units, std::string("mm"));
 
     //Publish button state on NAME/button
     std::ostringstream stream1;
-    stream1 << omni_name << "/button";
+    stream1 << prefix << "/button";
     std::string button_topic = std::string(stream1.str());
     button_publisher = n.advertise<omni_msgs::OmniButtonEvent>(button_topic.c_str(), 100);
 
     //Publish on NAME/state
     std::ostringstream stream2;
-    stream2 << omni_name << "/state";
+    stream2 << prefix << "/state";
     std::string state_topic_name = std::string(stream2.str());
     state_publisher = n.advertise<omni_msgs::OmniState>(state_topic_name.c_str(), 1);
 
     //Subscribe to NAME/force_feedback
     std::ostringstream stream3;
-    stream3 << omni_name << "/force_feedback";
+    stream3 << prefix << "/force_feedback";
     std::string force_feedback_topic = std::string(stream3.str());
     haptic_sub = n.subscribe(force_feedback_topic.c_str(), 1, &PhantomROS::force_callback, this);
 
     //Publish on NAME/pose
     std::ostringstream stream4;
-    stream4 << omni_name << "/pose";
+    stream4 << prefix << "/pose";
     std::string pose_topic_name = std::string(stream4.str());
     pose_publisher = n.advertise<geometry_msgs::PoseStamped>(pose_topic_name.c_str(), 1);
 
     //Publish on NAME/joint_states
     std::ostringstream stream5;
-    stream5 << omni_name << "/joint_states";
+    stream5 << prefix << "/joint_states";
     std::string joint_topic_name = std::string(stream5.str());
     joint_publisher = n.advertise<sensor_msgs::JointState>(joint_topic_name.c_str(), 1);
 
     //Publish on NAME/tip_pose
     std::ostringstream stream6;
-    stream6 << omni_name << "/tip_pose";
+    stream6 << prefix << "/tip_pose";
     std::string tip_pose_topic_name = std::string(stream6.str());
     tip_pose_publisher = n.advertise<geometry_msgs::PoseStamped>(tip_pose_topic_name.c_str(), 1);
-    
+
     //Publish on NAME/stylus_pose
     std::ostringstream stream7;
-    stream7 << omni_name << "/stylus_pose";
+    stream7 << prefix << "/stylus_pose";
     std::string stylus_pose_topic_name = std::string(stream7.str());
     stylus_pose_publisher = n.advertise<geometry_msgs::PoseStamped>(stylus_pose_topic_name.c_str(), 1);
-
 
     // Get the robot description from the parameter server
     ros::param::param(std::string("~robot_description_name"), robot_description_name, std::string("robot_description"));
@@ -140,12 +139,12 @@ public:
         return;
     }
     // Get the chain 
-    if (!kdl_tree.getChain("base", "tip", kdl_chain_tip)) {
-        ROS_ERROR("Failed to get KDL chain from base_link to end_effector.");
+    if (!kdl_tree.getChain(prefix + "_base", prefix + "_tip", kdl_chain_tip)) {
+        ROS_ERROR("Failed to get KDL chain from %s_base to %s_tip.", prefix.c_str(), prefix.c_str());
         return;
     }
-    if (!kdl_tree.getChain("base", "stylus", kdl_chain_stylus)) {
-        ROS_ERROR("Failed to get KDL chain from base_link to stylus.");
+    if (!kdl_tree.getChain(prefix + "_base", prefix + "_stylus", kdl_chain_stylus)) {
+        ROS_ERROR("Failed to get KDL chain from %s_base to %s_stylus.", prefix.c_str(), prefix.c_str());
         return;
     }
 

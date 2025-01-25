@@ -1,13 +1,14 @@
 <launch>
-  <arg name="reference_frame" default="base"/>
+  <arg name="reference_frame" default="touch_base"/>
   <arg name="units" default="mm"/>
   <arg name="publish_rate" default="1000"/>
   <arg name="prefix" default="touch"/>
   <arg name="device_name" default="Default Device"/>
+  <arg name="launch_rviz" default="true"/>
   
   <node name="omni_state" pkg="omni_common" type="omni_state" output="screen">
     <param name="device_name" value="$(arg device_name)"/>
-    <param name="omni_name" value="$(arg prefix)"/>
+    <param name="prefix" value="$(arg prefix)"/>
     <param name="publish_rate" value="$(arg publish_rate)"/>
     <param name="reference_frame" value="$(arg reference_frame)"/>
     <param name="units" value="$(arg units)"/>
@@ -20,5 +21,7 @@
       <remap from="robot_description" to="$(arg prefix)_robot_description" />
   </node>
 
-  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find omni_common)/launch/touch.rviz" required="true" />
+  <group if="$(arg launch_rviz)">
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find omni_common)/launch/touch.rviz" required="true" />
+  </group>
 </launch>

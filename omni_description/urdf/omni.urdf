@@ -11,9 +11,18 @@
 	<material name="white">
 		<color rgba="1.0 1.0 1.0 1.0" />
 	</material>
+
+  <!-- World -->
+  <link name="world" />
+
+  <joint name="world_to_base" type="fixed">
+    <parent link="world" />
+    <child link="touch_base" />
+    <origin xyz="0 0 0" rpy="0 0 0" />
+  </joint>
 	
 	<!-- Links -->
-  <link name="base" >
+  <link name="touch_base" >
     <visual>
 			<origin xyz="0 -0.02 0" />
       <geometry>
@@ -22,7 +31,7 @@
       <material name="metal_seamed"/>
     </visual>
   </link>
-  <link name="torso" >
+  <link name="touch_torso" >
     <visual>
 			<origin xyz="0 0 0.036" rpy="-1.5707 0 0"/>
       <geometry>
@@ -31,7 +40,7 @@
       <material name="blue"/>
     </visual>
   </link>
-  <link name="upper_arm" >
+  <link name="touch_upper_arm" >
 		<visual>
 			<origin xyz="0.0075 0 0" rpy="0 0 0"/>
       <geometry>
@@ -40,7 +49,7 @@
       <material name="metal_seamed" />
     </visual>
   </link>
-  <link name="lower_arm" >
+  <link name="touch_lower_arm" >
 		<visual>
 			<origin xyz="0 0 0" rpy="1.5707 0 0"/>
       <geometry>
@@ -49,7 +58,7 @@
       <material name="metal_seamed" />
     </visual>
   </link>
-  <link name="wrist" >
+  <link name="touch_wrist" >
 		<visual>
 			<origin xyz="0 0 0" rpy="3.14159 0 0"/>
       <geometry>
@@ -58,7 +67,7 @@
       <material name="metal_seamed" />
     </visual>
   </link>
-  <link name="tip" >
+  <link name="touch_tip" >
 		<visual>
 			<origin xyz="0 0 0" rpy="-1.5707 0 0"/>
       <geometry>
@@ -67,7 +76,7 @@
       <material name="metal_seamed" />
     </visual>
   </link>
-  <link name="stylus" >
+  <link name="touch_stylus" >
     <visual>
 			<origin xyz="0 -0.033 0" rpy="1.5707 1.5707 0"/>
       <geometry>
@@ -79,44 +88,44 @@
   
 	<!-- joints -->
   <joint name="waist" type="revolute" >
-    <parent link="base" />
-    <child link="torso" />
+    <parent link="touch_base" />
+    <child link="touch_torso" />
     <origin xyz="0 0 0.09" rpy="0 0 0" />
     <axis xyz="0 0 1" />
     <limit lower="-0.98" upper="0.98" velocity="100" effort="5" />
   </joint>
   <joint name="shoulder" type="revolute" >
-    <parent link="torso" />
-    <child link="upper_arm" />
+    <parent link="touch_torso" />
+    <child link="touch_upper_arm" />
     <origin xyz="-0.0075 0 0.035" rpy="0 0 0" />
     <axis xyz="1 0 0" />
     <limit lower="0" upper="1.75" velocity="100" effort="5" />
   </joint>
   <joint name="elbow" type="revolute" >
-    <parent link="upper_arm" />
-    <child link="lower_arm" />
+    <parent link="touch_upper_arm" />
+    <child link="touch_lower_arm" />
     <origin xyz="0.0075 .134 0" rpy="-1.5 0 0" />
     <axis xyz="1 0 0" />
 		<!-- upper="1.25" -->
     <limit lower="-0.81" upper="1.25" velocity="100" effort="5" /> 
   </joint>
   <joint name="yaw" type="revolute" >
-    <parent link="lower_arm" />
-    <child link="wrist" />
+    <parent link="touch_lower_arm" />
+    <child link="touch_wrist" />
     <origin xyz="0 0.08 0" />
     <axis xyz="0 1 0" />
     <limit lower="3.92" upper="8.83" velocity="100" effort="5" />
   </joint>
   <joint name="pitch" type="revolute" >
-    <parent link="wrist" />
-    <child link="tip" />
+    <parent link="touch_wrist" />
+    <child link="touch_tip" />
     <origin xyz="0 0.0525 0" rpy="0.5 0 0" />
     <axis xyz="1 0 0" />
     <limit lower="-0.5" upper="1.75" velocity="100" effort="5" />
   </joint>
   <joint name="roll" type="revolute" >
-    <parent link="tip" />
-    <child link="stylus" />
+    <parent link="touch_tip" />
+    <child link="touch_stylus" />
     <origin xyz="0 -0.023 0" rpy="3.14159 3.14159 0" />
     <axis xyz="0 1 0" />
     <limit lower="-2.58" upper="2.58" velocity="100" effort="5" />
