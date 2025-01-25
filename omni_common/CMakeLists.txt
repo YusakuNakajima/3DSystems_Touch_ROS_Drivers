@@ -8,9 +8,10 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs 
   tf
   kdl_parser
-  Eigen3
   orocos_kdl
 )
+
+find_package(Eigen3 REQUIRED)
 
 catkin_package(
 CATKIN_DEPENDS 
@@ -24,7 +25,7 @@ CATKIN_DEPENDS
   xacro
 )
 
-include_directories(${Boost_INCLUDE_DIR} ${catkin_INCLUDE_DIRS})
+include_directories(${Boost_INCLUDE_DIR} ${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIR})
 
 find_path(OPENHAPTICS_INCLUDE_DIR NAMES HD/hd.h HL/hl.h HDU/hdu.h)
 
@@ -39,6 +40,6 @@ target_link_libraries(omni HD HDU rt ncurses ${catkin_LIBRARIES})
 add_dependencies(omni omni_msgs_gencpp)
 
 add_executable(omni_state src/omni_state.cpp)
-target_link_libraries(omni_state HD HDU rt ncurses ${catkin_LIBRARIES})  # 変更
+target_link_libraries(omni_state HD HDU rt ncurses ${catkin_LIBRARIES} ${EIGEN3_LIBRARIES})
 add_dependencies(omni_state omni_msgs_gencpp)
 
