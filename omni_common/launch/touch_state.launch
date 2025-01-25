@@ -1,5 +1,5 @@
 <launch>
-  <arg name="reference_frame" default="/map"/>
+  <arg name="reference_frame" default="base"/>
   <arg name="units" default="mm"/>
   <arg name="publish_rate" default="1000"/>
   <arg name="prefix" default="touch"/>

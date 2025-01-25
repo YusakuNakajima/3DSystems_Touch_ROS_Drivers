@@ -66,7 +66,7 @@ public:
 
   void init(OmniState *s) {
     ros::param::param(std::string("~omni_name"), omni_name, std::string("phantom"));
-    ros::param::param(std::string("~reference_frame"), ref_frame, std::string("/map"));
+    ros::param::param(std::string("~reference_frame"), ref_frame, std::string("base"));
     ros::param::param(std::string("~units"), units, std::string("mm"));
 
     //Publish button state on NAME/button
