@@ -7,6 +7,9 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs 
   std_msgs 
   tf
+  kdl_parser
+  Eigen3
+  orocos_kdl
 )
 
 catkin_package(
@@ -36,6 +39,6 @@ target_link_libraries(omni HD HDU rt ncurses ${catkin_LIBRARIES})
 add_dependencies(omni omni_msgs_gencpp)
 
 add_executable(omni_state src/omni_state.cpp)
-target_link_libraries(omni_state HD HDU rt ncurses ${catkin_LIBRARIES})
+target_link_libraries(omni_state HD HDU rt ncurses ${catkin_LIBRARIES})  # 変更
 add_dependencies(omni_state omni_msgs_gencpp)
 
