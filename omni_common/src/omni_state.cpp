@@ -5,6 +5,12 @@
 #include <urdf/model.h>
 #include <sensor_msgs/JointState.h>
 
+#include <kdl_parser/kdl_parser.hpp>
+#include <kdl/chain.hpp>
+#include <kdl/chainfksolverpos_recursive.hpp>
+#include <tf/transform_broadcaster.h>  
+
+
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
@@ -27,6 +33,7 @@
 
 float prev_time;
 int calibrationStyle;
+KDL::Chain kdl_chain_tip, kdl_chain_stylus;
 
 struct OmniState {
   hduVector3Dd position;  //3x1 vector of position
@@ -57,10 +64,12 @@ public:
   ros::NodeHandle n;
   ros::Publisher state_publisher;
   ros::Publisher pose_publisher;
+  ros::Publisher tip_pose_publisher;
+  ros::Publisher stylus_pose_publisher;
   ros::Publisher button_publisher;
   ros::Publisher joint_publisher;
   ros::Subscriber haptic_sub;
-  std::string omni_name, ref_frame, units;
+  std::string omni_name, ref_frame, units, robot_description_name;
 
   OmniState *state;
 
@@ -98,6 +107,47 @@ public:
     stream5 << omni_name << "/joint_states";
     std::string joint_topic_name = std::string(stream5.str());
     joint_publisher = n.advertise<sensor_msgs::JointState>(joint_topic_name.c_str(), 1);
+
+    //Publish on NAME/tip_pose
+    std::ostringstream stream6;
+    stream6 << omni_name << "/tip_pose";
+    std::string tip_pose_topic_name = std::string(stream6.str());
+    tip_pose_publisher = n.advertise<geometry_msgs::PoseStamped>(tip_pose_topic_name.c_str(), 1);
+    
+    //Publish on NAME/stylus_pose
+    std::ostringstream stream7;
+    stream7 << omni_name << "/stylus_pose";
+    std::string stylus_pose_topic_name = std::string(stream7.str());
+    stylus_pose_publisher = n.advertise<geometry_msgs::PoseStamped>(stylus_pose_topic_name.c_str(), 1);
+
+
+    // Get the robot description from the parameter server
+    ros::param::param(std::string("~robot_description_name"), robot_description_name, std::string("robot_description"));
+    if (robot_description_name.empty()) {
+        ROS_ERROR("Robot description name is empty.");
+        return;
+    }
+    std::string robot_description_content;
+    if (!n.getParam(robot_description_name, robot_description_content)) {
+        ROS_ERROR("Failed to get robot description content.");
+        return;
+    }
+    ROS_INFO("Successfully retrieved robot description content from %s.", robot_description_name.c_str());
+    // Parse the URDF to a KDL tree
+    KDL::Tree kdl_tree;
+    if (!kdl_parser::treeFromString(robot_description_content, kdl_tree)) {
+        ROS_ERROR("Failed to parse URDF to KDL tree.");
+        return;
+    }
+    // Get the chain 
+    if (!kdl_tree.getChain("base", "tip", kdl_chain_tip)) {
+        ROS_ERROR("Failed to get KDL chain from base_link to end_effector.");
+        return;
+    }
+    if (!kdl_tree.getChain("base", "stylus", kdl_chain_stylus)) {
+        ROS_ERROR("Failed to get KDL chain from base_link to stylus.");
+        return;
+    }
 
     state = s;
     state->buttons[0] = 0;
@@ -193,6 +243,61 @@ public:
     joint_state.position[5] = state->thetas[6] - M_PI;
     joint_publisher.publish(joint_state);
 
+    // Publish the tip pose by forward kinematics
+    KDL::ChainFkSolverPos_recursive fk_solver_tip(kdl_chain_tip);
+    KDL::JntArray q_tip(kdl_chain_tip.getNrOfSegments());
+    for (size_t i = 0; i <kdl_chain_tip.getNrOfSegments(); ++i) {
+        q_tip(i) = joint_state.position[i];
+    }
+    KDL::Frame tip_frame;
+    if (fk_solver_tip.JntToCart(q_tip, tip_frame) >= 0) {
+        // ROS_INFO("End Effector Position: x=%.2f, y=%.2f, z=%.2f",
+        //          tip_frame.p.x(), tip_frame.p.y(), tip_frame.p.z());
+        double roll, pitch, yaw;
+        tip_frame.M.GetRPY(roll, pitch, yaw);
+        // ROS_INFO("End Effector Orientation: roll=%.2f, pitch=%.2f, yaw=%.2f",
+        //          roll, pitch, yaw);
+        geometry_msgs::PoseStamped tip_pose_msg;
+        tip_pose_msg.header = state_msg.header;
+        tip_pose_msg.header.frame_id = ref_frame;
+        tip_pose_msg.pose = state_msg.pose;
+        tip_pose_msg.pose.position.x = tip_frame.p.x();
+        tip_pose_msg.pose.position.y = tip_frame.p.y();
+        tip_pose_msg.pose.position.z = tip_frame.p.z();
+        tip_pose_msg.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(roll, pitch, yaw);
+        tip_pose_publisher.publish(tip_pose_msg);
+    } else {
+        ROS_ERROR("Failed to compute forward kinematics for the tip frame.");
+    }
+
+    // Publish the stylus pose by forward kinematics
+    KDL::ChainFkSolverPos_recursive fk_solver_stylus(kdl_chain_stylus);
+    KDL::JntArray q_stylus(kdl_chain_stylus.getNrOfSegments());
+    for (size_t i = 0; i <kdl_chain_stylus.getNrOfSegments(); ++i) {
+        q_stylus(i) = joint_state.position[i];
+    }
+    KDL::Frame stylus_frame;
+    if (fk_solver_stylus.JntToCart(q_stylus, stylus_frame) >= 0) {
+        // ROS_INFO("End Effector Position: x=%.2f, y=%.2f, z=%.2f",
+        //          stylus_frame.p.x(), stylus_frame.p.y(), stylus_frame.p.z());
+        double roll, pitch, yaw;
+        stylus_frame.M.GetRPY(roll, pitch, yaw);
+        // ROS_INFO("End Effector Orientation: roll=%.2f, pitch=%.2f, yaw=%.2f",
+        //          roll, pitch, yaw);
+        geometry_msgs::PoseStamped stylus_pose_msg;
+        stylus_pose_msg.header = state_msg.header;
+        stylus_pose_msg.header.frame_id = ref_frame;
+        stylus_pose_msg.pose = state_msg.pose;
+        stylus_pose_msg.pose.position.x = stylus_frame.p.x();
+        stylus_pose_msg.pose.position.y = stylus_frame.p.y();
+        stylus_pose_msg.pose.position.z = stylus_frame.p.z();
+        stylus_pose_msg.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(roll, pitch, yaw);
+        stylus_pose_publisher.publish(stylus_pose_msg);
+    } else {
+        ROS_ERROR("Failed to compute forward kinematics for the stylus frame.");
+    }
+
+
     // Build the pose msg
     geometry_msgs::PoseStamped pose_msg;
     pose_msg.header = state_msg.header;
@@ -232,13 +337,16 @@ HDCallbackCode HDCALLBACK omni_state_callback(void *pUserData)
   hdBeginFrame(hdGetCurrentDevice());
   // Get transform and angles
   hduMatrix transform;
+  hduVector3Dd position;
   hdGetDoublev(HD_CURRENT_TRANSFORM, transform);
   hdGetDoublev(HD_CURRENT_JOINT_ANGLES, omni_state->joints);
+  hdGetDoublev(HD_CURRENT_POSITION, position);
   hduVector3Dd gimbal_angles;
   hdGetDoublev(HD_CURRENT_GIMBAL_ANGLES, gimbal_angles);
   // Notice that we are inverting the Z-position value and changing Y <---> Z
   // Position
   omni_state->position = hduVector3Dd(transform[3][0], -transform[3][2], transform[3][1]);
+  // omni_state->position = position
   omni_state->position /= omni_state->units_ratio;
   // Orientation (quaternion)
   hduMatrix rotation(transform);

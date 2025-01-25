@@ -11,6 +11,7 @@
     <param name="publish_rate" value="$(arg publish_rate)"/>
     <param name="reference_frame" value="$(arg reference_frame)"/>
     <param name="units" value="$(arg units)"/>
+    <param name="robot_description_name" value="$(arg prefix)_robot_description" />
   </node>
 
   <param name="$(arg prefix)_robot_description" command="cat $(find omni_description)/urdf/omni.urdf" />
