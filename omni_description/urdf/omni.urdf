@@ -86,6 +86,17 @@
     </visual>
   </link>
   
+  <!-- New touch_force link -->
+  <link name="touch_force">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+      <material name="white"/>
+    </visual>
+  </link>
+  
 	<!-- joints -->
   <joint name="waist" type="revolute" >
     <parent link="touch_base" />
@@ -130,5 +141,10 @@
     <axis xyz="0 1 0" />
     <limit lower="-2.58" upper="2.58" velocity="100" effort="5" />
   </joint>
+  <joint name="touch_tip_to_touch_force" type="fixed">
+    <parent link="touch_base"/>
+    <child link="touch_force"/>
+    <origin xyz="0 0.1 0.3" rpy="0 0 3.14159"/>
+		  </joint>
 </robot>
 
