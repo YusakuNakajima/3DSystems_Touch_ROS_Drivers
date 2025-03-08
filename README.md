@@ -28,13 +28,13 @@ Run the following command to install the device driver.
 > **Note**: Although the official documentation does not explicitly mention support for Ubuntu 20.04, confirmation from 3D Systems indicates that this driver is compatible with Ubuntu 20.04 as well.  
 
 ```bash
-./touch_hid_driver_install.sh
+./install_all.sh
 ```
 
-During the installation process, you can test the connection of the device by responding to the prompt:  
+You can test the connection of the device by responding to the prompt:  
 
 ```bash
-Do you want to run TouchCheckup for connection test? (OpenHaptics setup is included) [y/n]: y
+./checkup_Touch_device.sh
 ```
 
 ## Launch ROS Node
