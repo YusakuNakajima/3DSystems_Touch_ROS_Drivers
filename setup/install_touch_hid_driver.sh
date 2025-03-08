@@ -32,4 +32,8 @@ echo "--- Removing temporary files"
 cd $CUR_DIR
 rm -rf tmp
 
+echo "--- Installing dependencies"
+apt-get update
+apt-get install -y libqt5widgets5 libncurses5
+
 echo "--- Done"
