@@ -43,7 +43,7 @@ After installing the device driver and building the workspace, you can launch th
 This launch file will start the ROS node and publish the data from the haptic device.
 You can read data from the haptic device and write force feedback to the device.
 ```bash
-roslaunch omni_common omni_state.launch
+roslaunch omni_common touch_state.launch
 ```
 
 Data from the haptic device can be read from the following topics:
@@ -60,27 +60,7 @@ Data from the haptic device can be read from the following topics:
 
 With RViz visualization launch is as follows:
 ```bash
-roslaunch omni_common omni.launch
-```
-
-
-## Use Multiple Devices
-
-Multiple devices can be connected by adding a unique name to each device. **Following settings need to be made every time the devices are reconnected**:
-
-1. Run Geomagic_Touch_Setup in /opt/geomagic_touch_device_driver/
-
-2. Add a new name by pressing `Add...` button in `Device Name` section and typing that name in the pop-up window
-
-3. Select that name in the drop-down list of `Device Name`
-
-4. Select `Port Num` of the device which you want to add that name to
-
-5. Press `Apply`
-
-Example to run two devices (`Left Device` and `Right Device`):
-```
-roslaunch omni_common dual_phantom.launch
+roslaunch omni_common touch.launch
 ```
 
 ## Acknowledgements and Citation
