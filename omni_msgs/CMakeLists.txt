@@ -1,16 +1,22 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.8)
 project(omni_msgs)
 
-find_package(catkin REQUIRED COMPONENTS roscpp rospy message_generation geometry_msgs sensor_msgs std_msgs)
+# Find ROS 2 packages
+find_package(ament_cmake REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 
-add_message_files(FILES 
-		OmniFeedback.msg 
-		OmniButtonEvent.msg 
-		OmniState.msg
-		)
+find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 
-generate_messages(DEPENDENCIES geometry_msgs sensor_msgs std_msgs)
+# Message generation
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/OmniFeedback.msg"
+  "msg/OmniButtonEvent.msg"
+  "msg/OmniState.msg"
+  DEPENDENCIES geometry_msgs sensor_msgs std_msgs
+)
 
-catkin_package(CATKIN_DEPENDS message_runtime geometry_msgs sensor_msgs std_msgs)
+ament_export_dependencies(rosidl_default_runtime)
 
-include_directories(${catkin_INCLUDE_DIRS})
+ament_package()

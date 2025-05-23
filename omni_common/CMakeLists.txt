@@ -1,45 +1,92 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.10)
 project(omni_common)
 
-find_package(catkin REQUIRED COMPONENTS 
-  geometry_msgs 
-  omni_msgs 
-  sensor_msgs 
-  std_msgs 
-  tf
-  kdl_parser
-)
-
-find_package(Eigen3 REQUIRED)
+# ============================================================
+# 1. Dependencies
+# ============================================================
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(kdl_parser REQUIRED)
 find_package(orocos_kdl REQUIRED)
+find_package(Eigen3 REQUIRED)
 
-catkin_package(
-CATKIN_DEPENDS 
-  geometry_msgs 
-  omni_description 
-  omni_msgs 
-  robot_state_publisher 
-  sensor_msgs 
-  std_msgs 
-  tf
-  xacro
+# Optional: omni_msgs (custom message package)
+find_package(omni_msgs REQUIRED)
+
+# Phantom Omni SDK include path (manual search if necessary)
+find_path(OPENHAPTICS_INCLUDE_DIR
+  NAMES HD/hd.h HL/hl.h
+  PATHS /opt/OpenHaptics/Developer/3.4/include
 )
-
-include_directories(${Boost_INCLUDE_DIR} ${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIR}　${OROCOS_KDL_INCLUDE_DIR})
-
-find_path(OPENHAPTICS_INCLUDE_DIR NAMES HD/hd.h HL/hl.h HDU/hdu.h)
 
 if(NOT OPENHAPTICS_INCLUDE_DIR)
-  set(OPENHAPTICS_MESSAGE "OPENHAPTICS was not found. If you do not have it you will not be able to use the Phantom Omni.")
-  message(STATUS "${OPENHAPTICS_MESSAGE}") 
-  return()
-endif(NOT OPENHAPTICS_INCLUDE_DIR)
-  
-add_executable(omni src/omni.cpp)
-target_link_libraries(omni HD HDU rt ncurses ${catkin_LIBRARIES})
-add_dependencies(omni omni_msgs_gencpp)
+  message(FATAL_ERROR "OpenHaptics headers not found! Set OPENHAPTICS_INCLUDE_DIR manually.")
+endif()
 
+include_directories(
+  ${OPENHAPTICS_INCLUDE_DIR}
+  include
+  ${EIGEN3_INCLUDE_DIRS}
+)
+
+# ============================================================
+# 2. Sources and Executables
+# ============================================================
+
+# Main node (omni_state)
 add_executable(omni_state src/omni_state.cpp)
-target_link_libraries(omni_state HD HDU rt ncurses ${catkin_LIBRARIES} ${EIGEN3_LIBRARIES} ${OROCOS_KDL_LIBRARIES})
-add_dependencies(omni_state omni_msgs_gencpp)
+ament_target_dependencies(omni_state
+  rclcpp
+  geometry_msgs
+  sensor_msgs
+  std_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  kdl_parser
+  orocos_kdl
+  omni_msgs
+)
+target_link_libraries(omni_state
+  HD
+  HDU
+  pthread
+)
 
+# Optionally another node (omni)
+add_executable(omni src/omni.cpp)
+ament_target_dependencies(omni
+  rclcpp
+  geometry_msgs
+  sensor_msgs
+  std_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  kdl_parser
+  orocos_kdl
+  omni_msgs
+)
+target_link_libraries(omni
+  HD
+  HDU
+  pthread
+)
+
+# ============================================================
+# 3. Install
+# ============================================================
+install(DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}/launch
+)
+
+# ============================================================
+# 4. Package
+# ============================================================
+ament_package()

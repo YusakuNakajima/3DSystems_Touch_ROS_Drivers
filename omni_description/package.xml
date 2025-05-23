@@ -1,17 +1,24 @@
 <?xml version="1.0"?>
-<package>
+<package format="3">
   <name>omni_description</name>
+  <version>0.1.0</version>
   <description>The omni_description package</description>
 
-	<version>0.1.0</version>
   <maintainer email="fsuarez6@gmail.com">Francisco Suarez-Ruiz</maintainer>
   <license>BSD</license>
+
   <url type="website">https://github.com/fsuarez6/phantom_omni</url>
   <url type="repository">https://github.com/fsuarez6/phantom_omni</url>
-  <author>Francisco Suarez-Ruiz</author>
-  
-  <buildtool_depend>catkin</buildtool_depend>
-  <build_depend>urdf</build_depend>
-  <run_depend>urdf</run_depend>
 
+  <author email="fsuarez6@gmail.com">Francisco Suarez-Ruiz</author>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- Optional: Only if you use xacro or install launch files -->
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
 </package>

@@ -1,34 +1,38 @@
-<package>
+<?xml version="1.0"?>
+<package format="3">
   <name>omni_common</name>
-  <description>
-     ROS Nodes for Sensable Phantom Omni devices.
-  </description>
-  
   <version>0.1.0</version>
+  <description>ROS 2 Nodes for Sensable Phantom Omni devices.</description>
+
   <maintainer email="fsuarez6@gmail.com">Francisco Suarez-Ruiz</maintainer>
+  <author>Francisco Suarez-Ruiz</author>
   <license>BSD</license>
+
   <url type="website">https://github.com/fsuarez6/phantom_omni</url>
   <url type="repository">https://github.com/fsuarez6/phantom_omni</url>
-  <author>Francisco Suarez-Ruiz</author>
 
-  <buildtool_depend>catkin</buildtool_depend>
+  <!-- Build tool -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <build_depend>bullet</build_depend>
-  <build_depend>geometry_msgs</build_depend>
-  <build_depend>omni_msgs</build_depend>
-  <build_depend>sensor_msgs</build_depend>
-  <build_depend>std_msgs</build_depend>
-  <build_depend>tf</build_depend>
-  
-  <run_depend>geometry_msgs</run_depend>
-  <run_depend>omni_description</run_depend>
-  <run_depend>omni_msgs</run_depend>
-  <run_depend>robot_state_publisher</run_depend>
-  <run_depend>sensor_msgs</run_depend>
-  <run_depend>std_msgs</run_depend>
-  <run_depend>tf</run_depend>
-  <run_depend>xacro</run_depend> 
-  
+  <!-- Common dependencies -->
+  <depend>rclcpp</depend>
+  <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>kdl_parser</depend>
+  <depend>orocos_kdl</depend>
+  <depend>omni_msgs</depend>               <!-- Custom messages -->
+  <depend>robot_state_publisher</depend>   <!-- Optional runtime -->
+  <depend>xacro</depend>                   <!-- If URDFs are still used -->
+
+  <!-- Optional: Bullet if needed -->
+  <depend>bullet</depend>
+
+  <!-- Export -->
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
 </package>
-
-
