@@ -15,12 +15,20 @@ def launch_setup(context, *args, **kwargs):
     reference_frame = LaunchConfiguration('reference_frame').perform(context)
     units = LaunchConfiguration('units').perform(context)
 
-    robot_description_name = f'{prefix}_robot_description'
+   
     urdf_path = os.path.join(
         get_package_share_directory('omni_description'),
         'urdf/omni.urdf'
     )
-
+    robot_description = ParameterValue(
+        Command([
+            TextSubstitution(text='cat'),
+            TextSubstitution(text=' '),  # 空白を明示的に入れる
+            TextSubstitution(text=urdf_path)
+        ]),
+        value_type=str
+    )
+    
     return [
         # omni_state
         Node(
@@ -34,7 +42,8 @@ def launch_setup(context, *args, **kwargs):
                 'publish_rate': int(publish_rate),
                 'reference_frame': reference_frame,
                 'units': units,
-                'robot_description_name': robot_description_name
+                'robot_description': robot_description,
+                # 'robot_description_name': robot_description_name
             }]
         ),
 
@@ -44,19 +53,12 @@ def launch_setup(context, *args, **kwargs):
             executable='robot_state_publisher',
             name=f'{prefix}_robot_state_publisher',
             parameters=[{
-                robot_description_name: ParameterValue(
-                    Command([
-                        TextSubstitution(text='cat'),
-                        TextSubstitution(text=' '),  # 空白を明示的に入れる
-                        TextSubstitution(text=urdf_path)
-                     ]),
-                    value_type=str
-                )
-             }],
-            remappings=[
-                ('/joint_states', f'{prefix}/joint_states'),
-                ('/robot_description', robot_description_name)
-            ]
+                'robot_description': robot_description 
+            }],
+            # remappings=[
+            #     ('/joint_states', f'{prefix}/joint_states'),
+            #     ('/robot_description', robot_description_name)
+            # ]
         ),
 
         # rviz (別途起動)

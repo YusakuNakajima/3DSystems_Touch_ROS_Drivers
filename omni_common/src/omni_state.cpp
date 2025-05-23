@@ -83,12 +83,15 @@ public:
     declare_parameter<std::string>("prefix", "phantom");
     declare_parameter<std::string>("reference_frame", "base");
     declare_parameter<std::string>("units", "mm");
-    declare_parameter<std::string>("robot_description_name", "robot_description");
+    declare_parameter<std::string>("robot_description", "");
+
+
 
     prefix_ = get_parameter("prefix").as_string();
     reference_frame_ = get_parameter("reference_frame").as_string();
     units_ = get_parameter("units").as_string();
-    robot_description_name_ = get_parameter("robot_description_name").as_string();
+    tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
+
 
     initialize_state();
 
@@ -99,11 +102,13 @@ public:
     stylus_pose_pub_ = create_publisher<geometry_msgs::msg::PoseStamped>(prefix_ + "/stylus_pose", 10);
     joint_pub_ = create_publisher<sensor_msgs::msg::JointState>(prefix_ + "/joint_states", 10);
 
+    tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(*this);
+    
     force_sub_ = create_subscription<omni_msgs::msg::OmniFeedback>(
       prefix_ + "/force_feedback", 10,
       std::bind(&PhantomROS::force_callback, this, std::placeholders::_1));
 
-    if (!get_parameter(robot_description_name_, robot_description_)) {
+    if (!get_parameter("robot_description", robot_description_)) {
       RCLCPP_ERROR(get_logger(), "Failed to get robot_description parameter.");
       return;
     }
@@ -155,12 +160,42 @@ public:
     msg.current.z = state_->force[2];
 
     state_pub_->publish(msg);
+
+    geometry_msgs::msg::PoseStamped tip_pose;
+    tip_pose.header.stamp = now();
+    tip_pose.header.frame_id = reference_frame_;
+    tip_pose.pose.position.x = state_->position[0];
+    tip_pose.pose.position.y = state_->position[1];
+    tip_pose.pose.position.z = state_->position[2];
+
+    tf2::Quaternion quat;
+    quat.setX(state_->rot.v()[0]);
+    quat.setY(state_->rot.v()[1]);
+    quat.setZ(state_->rot.v()[2]);
+    quat.setW(state_->rot.s());
+    tip_pose.pose.orientation = tf2::toMsg(quat);
+
+    tip_pose_pub_->publish(tip_pose);
+
+    // --- Broadcast TF (touch_base → touch_tip) ---
+    geometry_msgs::msg::TransformStamped tf_msg;
+    tf_msg.header.stamp = now();
+    tf_msg.header.frame_id = reference_frame_;             // e.g., "touch_base"
+    tf_msg.child_frame_id = prefix_ + "_tip";              // e.g., "touch_tip"
+    tf_msg.transform.translation.x = state_->position[0];
+    tf_msg.transform.translation.y = state_->position[1];
+    tf_msg.transform.translation.z = state_->position[2];
+    tf_msg.transform.rotation = tip_pose.pose.orientation;
+
+    tf_broadcaster_->sendTransform(tf_msg);
   }
+
 
 private:
   std::shared_ptr<OmniState> state_;
-  std::string prefix_, reference_frame_, units_, robot_description_name_;
+  std::string prefix_, reference_frame_, units_;
   std::string robot_description_;
+  std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
   rclcpp::Publisher<omni_msgs::msg::OmniButtonEvent>::SharedPtr button_pub_;
   rclcpp::Publisher<omni_msgs::msg::OmniState>::SharedPtr state_pub_;

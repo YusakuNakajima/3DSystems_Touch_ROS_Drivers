@@ -86,6 +86,10 @@ install(DIRECTORY launch/
   DESTINATION share/${PROJECT_NAME}/launch
 )
 
+install(TARGETS omni_state omni
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 # ============================================================
 # 4. Package
 # ============================================================
