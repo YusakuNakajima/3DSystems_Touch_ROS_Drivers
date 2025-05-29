@@ -78,7 +78,7 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('reference_frame', default_value='touch_base'),
-        DeclareLaunchArgument('units', default_value='mm'),
+        DeclareLaunchArgument('units', default_value='m'),
         DeclareLaunchArgument('publish_rate', default_value='1000'),
         DeclareLaunchArgument('prefix', default_value='touch'),
         DeclareLaunchArgument('device_name', default_value='Default Device'),

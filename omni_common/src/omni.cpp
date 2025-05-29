@@ -260,7 +260,10 @@ HDCallbackCode HDCALLBACK omni_state_callback(void *pUserData) {
   return HD_CALLBACK_CONTINUE;
 }
 
-
+  std::shared_ptr<OmniState> get_state() { return state_; }
+  rclcpp::Publisher<omni_msgs::msg::OmniState>::SharedPtr get_state_publisher() { return device_state_pub_; }
+  const KDL::Chain& get_tip_chain() const { return kdl_chain_tip_; }
+  const KDL::Chain& get_stylus_chain() const { return kdl_chain_stylus_; }
 void HHD_Auto_Calibration() {
   int supportedCalibrationStyles;
   HDErrorInfo error;

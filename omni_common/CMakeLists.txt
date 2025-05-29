@@ -15,6 +15,7 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(kdl_parser REQUIRED)
 find_package(orocos_kdl REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(urdf REQUIRED)
 
 # Optional: omni_msgs (custom message package)
 find_package(omni_msgs REQUIRED)
@@ -52,6 +53,7 @@ ament_target_dependencies(omni_state
   kdl_parser
   orocos_kdl
   omni_msgs
+  urdf
 )
 target_link_libraries(omni_state
   HD
@@ -78,6 +80,7 @@ target_link_libraries(omni
   HDU
   pthread
 )
+
 
 # ============================================================
 # 3. Install
