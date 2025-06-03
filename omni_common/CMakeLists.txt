@@ -62,24 +62,24 @@ target_link_libraries(omni_state
 )
 
 # Optionally another node (omni)
-add_executable(omni src/omni.cpp)
-ament_target_dependencies(omni
-  rclcpp
-  geometry_msgs
-  sensor_msgs
-  std_msgs 
-  tf2
-  tf2_ros
-  tf2_geometry_msgs
-  kdl_parser
-  orocos_kdl
-  omni_msgs
-)
-target_link_libraries(omni
-  HD
-  HDU
-  pthread
-)
+# add_executable(omni src/omni.cpp)
+# ament_target_dependencies(omni
+#   rclcpp
+#   geometry_msgs
+#   sensor_msgs
+#   std_msgs 
+#   tf2
+#   tf2_ros
+#   tf2_geometry_msgs
+#   kdl_parser
+#   orocos_kdl
+#   omni_msgs
+# )
+# target_link_libraries(omni
+#   HD
+#   HDU
+#   pthread
+# )
 
 
 # ============================================================
@@ -89,7 +89,7 @@ install(DIRECTORY launch/
   DESTINATION share/${PROJECT_NAME}/launch
 )
 
-install(TARGETS omni_state omni
+install(TARGETS omni_state 
   DESTINATION lib/${PROJECT_NAME}
 )
 

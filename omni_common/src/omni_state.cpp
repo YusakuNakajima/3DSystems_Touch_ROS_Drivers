@@ -13,19 +13,17 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <urdf/model.h>
 
-#include <string>
-#include <memory>
-#include <cmath>
+#include <string.h>
+#include <stdio.h>
+#include <math.h>
+#include <assert.h>
 #include <sstream>
-#include <thread>
-#include <chrono>
-#include <vector>
 
 
-#include <HD/hd.h>
 #include <HL/hl.h>
-#include <HDU/hduVector.h>
+#include <HD/hd.h>
 #include <HDU/hduError.h>
+#include <HDU/hduVector.h>
 #include <HDU/hduMatrix.h>
 #include <HDU/hduQuaternion.h>
 #define BT_EULER_DEFAULT_ZYX
@@ -36,8 +34,8 @@
 #include "omni_msgs/msg/omni_state.hpp"
 
 
-int calibrationStyle = HD_CALIBRATION_AUTO;
 
+int calibrationStyle;
 
 struct OmniState {
   hduVector3Dd position;  
@@ -62,31 +60,76 @@ struct OmniState {
   double units_ratio;      
 };
 
+
+//TODO
 class PhantomROS : public rclcpp::Node {
+private:
   std::shared_ptr<OmniState> state;
-  std::string prefix_, reference_frame_, units_;
-  std::string robot_description_;
-  std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+  rclcpp::Publisher<omni_msgs::msg::OmniButtonEvent>::SharedPtr button_pub;
+  rclcpp::Publisher<omni_msgs::msg::OmniState>::SharedPtr device_state_pub;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr device_pose_pub;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr tip_5axis_pose_pub;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr tip_6axis_pose_pub;
+  rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_pub;
+  rclcpp::Subscription<omni_msgs::msg::OmniFeedback>::SharedPtr force_sub;
+  KDL::Chain kdl_chain_tip, kdl_chain_stylus;
+  std::string prefix, reference_frame, units, robot_description;
 
-  rclcpp::Publisher<omni_msgs::msg::OmniButtonEvent>::SharedPtr button_pub_;
-  rclcpp::Publisher<omni_msgs::msg::OmniState>::SharedPtr device_state_pub_;
-  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr device_pose_pub_;
-  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr tip_5axis_pose_pub_;
-  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr tip_6axis_pose_pub_;
-  rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_pub_;
-  rclcpp::Subscription<omni_msgs::msg::OmniFeedback>::SharedPtr force_sub_;
+  void force_callback(const omni_msgs::msg::OmniFeedback::SharedPtr omnifeed) {
+    state->force[0] = omnifeed->force.x - 0.001 * state->velocity[0];
+    state->force[1] = omnifeed->force.y - 0.001 * state->velocity[1];
+    state->force[2] = omnifeed->force.z - 0.001 * state->velocity[2];
 
-  KDL::Tree kdl_tree_;
-  KDL::Chain kdl_chain_tip_;
-  KDL::Chain kdl_chain_stylus_;
+    state->lock_pos[0] = omnifeed->position.x;
+    state->lock_pos[1] = omnifeed->position.y;
+    state->lock_pos[2] = omnifeed->position.z;
+  }
 
 public:
-  PhantomROS(std::shared_ptr<OmniState> s)
-  : Node("phantom_ros"), state(s) {
-    prefix_ = declare_parameter<std::string>("prefix", "phantom");
-    reference_frame_ = declare_parameter<std::string>("reference_frame", "base");
-    units_ = declare_parameter<std::string>("units", "mm");
-    robot_description_ = declare_parameter<std::string>("robot_description_name", "robot_description");
+  PhantomROS(std::shared_ptr<OmniState> s) : Node("phantom_ros"), state(s) {}
+
+  void init(std::shared_ptr<OmniState> s){
+    this->declare_parameter("prefix", "phantom");
+    this->declare_parameter("reference_frame", "base");
+    this->declare_parameter("units", "mm");
+    this->declare_parameter("robot_description_name", "robot_description");
+
+    prefix = this->get_parameter("prefix").as_string();
+    reference_frame = this->get_parameter("reference_frame").as_string();
+    units = this->get_parameter("units").as_string();
+    robot_description = this->get_parameter("robot_description_name").as_string();
+
+    button_pub = this->create_publisher<omni_msgs::msg::OmniButtonEvent>("button_event", 10);
+    device_state_pub = this->create_publisher<omni_msgs::msg::OmniState>("device_state", 10);
+    device_pose_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("device_pose", 10);
+    tip_5axis_pose_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("tip_5axis_pose", 10);
+    tip_6axis_pose_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("tip_6axis_pose", 10);
+    joint_pub = this->create_publisher<sensor_msgs::msg::JointState>("joint_states", 10);
+    force_sub = this->create_subscription<omni_msgs::msg::OmniFeedback>(
+        "force_feedback", 10, std::bind(&PhantomROS::force_callback, this, std::placeholders::_1));
+
+    std::string robot_description_content;
+    if (!this->get_parameter(robot_description, robot_description_content)) {
+      RCLCPP_ERROR(this->get_logger(), "Parameter [%s] not found", robot_description.c_str());
+      return;
+    } else{
+      RCLCPP_INFO(this->get_logger(), "Parameter [%s] found", robot_description.c_str());
+    }
+
+
+    KDL::Tree kdl_tree;
+    if (!kdl_parser::treeFromString(robot_description_content, kdl_tree)) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to parse URDF into KDL tree");
+      return;
+    }
+    if (!kdl_tree.getChain("base", "tip", kdl_chain_tip)) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to get KDL chain from base to tip");
+      return;
+    }
+    if (!kdl_tree.getChain("base", "stylus", kdl_chain_stylus)) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to get KDL chain from base to stylus");
+      return;
+    }
 
 
     state = s;
@@ -107,31 +150,25 @@ public:
     state->lock = false;
     state->close_gripper = false;
     state->lock_pos = zeros;
-    if (!units_.compare("mm"))
+    if (!units.compare("mm"))
       state->units_ratio = 1.0;
-    else if (!units_.compare("cm"))
+    else if (!units.compare("cm"))
       state->units_ratio = 10.0;
-    else if (!units_.compare("dm"))
+    else if (!units.compare("dm"))
       state->units_ratio = 100.0;
-    else if (!units_.compare("m"))
+    else if (!units.compare("m"))
       state->units_ratio = 1000.0;
     else
     {
       state->units_ratio = 1.0;
-      RCLCPP_WARN(this->get_logger(), "Unknown units [%s] unsing [mm]", units_.c_str());
-      units_ = "mm";
+      RCLCPP_WARN(this->get_logger(), "Unknown units [%s] unsing [mm]", units.c_str());
+      units = "mm";
     }
-    RCLCPP_INFO(this->get_logger(), "PHaNTOM position given in [%s], ratio [%.1f]", units_.c_str(), state->units_ratio);
+    RCLCPP_INFO(this->get_logger(), "PHaNTOM position given in [%s], ratio [%.1f]", units.c_str(), state->units_ratio);
   }
 
-  void force_callback(const omni_msgs::msg::OmniFeedback::SharedPtr msg) {
-    if (msg->force.x != 0.0 || msg->force.y != 0.0 || msg->force.z != 0.0) {
-      hduVector3Dd force(msg->force.x, -msg->force.z, msg->force.y);
-      state->force = force * state->units_ratio;
-    } else {
-      state->force = hduVector3Dd(0.0, 0.0, 0.0);
-    }
-  }
+
+
   void publish_omni_state() {
     omni_msgs::msg::OmniState state_msg;
 
@@ -152,8 +189,8 @@ public:
     state_msg.velocity.z = state->velocity[2];
 
     state_msg.header.stamp = now();
-    state_msg.header.frame_id = reference_frame_;
-    device_state_pub_->publish(state_msg);
+    state_msg.header.frame_id = reference_frame;
+    device_state_pub->publish(state_msg);
 
     
     sensor_msgs::msg::JointState joint_state;
@@ -172,13 +209,13 @@ public:
     joint_state.position[4] = -state->thetas[5] - 3*M_PI/4;
     joint_state.name[5] = "roll";
     joint_state.position[5] = state->thetas[6] - M_PI;
-    joint_pub_->publish(joint_state);
+    joint_pub->publish(joint_state);
 
 
     // Publish the tip pose by forward kinematics
-    KDL::ChainFkSolverPos_recursive fk_solver_tip(kdl_chain_tip_);
-    KDL::JntArray q_tip(kdl_chain_tip_.getNrOfSegments());
-    for (size_t i = 0; i <kdl_chain_tip_.getNrOfSegments(); ++i) {
+    KDL::ChainFkSolverPos_recursive fk_solver_tip(kdl_chain_tip);
+    KDL::JntArray q_tip(kdl_chain_tip.getNrOfSegments());
+    for (size_t i = 0; i <kdl_chain_tip.getNrOfSegments(); ++i) {
         q_tip(i) = joint_state.position[i];
     }
     KDL::Frame tip_frame;
@@ -190,23 +227,27 @@ public:
         // ROS_INFO("End Effector Orientation: roll=%.2f, pitch=%.2f, yaw=%.2f",
         //          roll, pitch, yaw);
         geometry_msgs::msg::PoseStamped tip_pose_msg;
+        tf2::Quaternion q;
+        q.setRPY(roll, pitch, yaw);
+        geometry_msgs::msg::Quaternion quat_msg = tf2::toMsg(q);
+      
         tip_pose_msg.header = state_msg.header;
-        tip_pose_msg.header.frame_id = reference_frame_;
+        tip_pose_msg.header.frame_id = reference_frame;
         tip_pose_msg.pose = state_msg.pose;
         tip_pose_msg.pose.position.x = tip_frame.p.x();
         tip_pose_msg.pose.position.y = tip_frame.p.y();
         tip_pose_msg.pose.position.z = tip_frame.p.z();
-        tip_pose_msg.pose.orientation = tf2::createQuaternionMsgFromRollPitchYaw(roll, pitch, yaw);
-        tip_6axis_pose_pub_->publish(tip_pose_msg);
+        tip_pose_msg.pose.orientation = quat_msg;
+        tip_5axis_pose_pub->publish(tip_pose_msg);
     } else {
         RCLCPP_ERROR(this->get_logger(), "Failed to compute forward kinematics for the tip frame.");
     }
 
 
     // Publish the stylus pose by forward kinematics
-    KDL::ChainFkSolverPos_recursive fk_solver_stylus(kdl_chain_stylus_);
-    KDL::JntArray q_stylus(kdl_chain_stylus_.getNrOfSegments());
-    for (size_t i = 0; i <kdl_chain_stylus_.getNrOfSegments(); ++i) {
+    KDL::ChainFkSolverPos_recursive fk_solver_stylus(kdl_chain_stylus);
+    KDL::JntArray q_stylus(kdl_chain_stylus.getNrOfSegments());
+    for (size_t i = 0; i <kdl_chain_stylus.getNrOfSegments(); ++i) {
         q_stylus(i) = joint_state.position[i];
     }
     KDL::Frame stylus_frame;
@@ -218,14 +259,17 @@ public:
         // ROS_INFO("End Effector Orientation: roll=%.2f, pitch=%.2f, yaw=%.2f",
         //          roll, pitch, yaw);
         geometry_msgs::msg::PoseStamped stylus_pose_msg;
+        tf2::Quaternion q;
+        q.setRPY(roll, pitch, yaw);
+        geometry_msgs::msg::Quaternion quat_msg = tf2::toMsg(q);
         stylus_pose_msg.header = state_msg.header;
-        stylus_pose_msg.header.frame_id = reference_frame_;
+        stylus_pose_msg.header.frame_id = reference_frame;
         stylus_pose_msg.pose = state_msg.pose;
         stylus_pose_msg.pose.position.x = stylus_frame.p.x();
         stylus_pose_msg.pose.position.y = stylus_frame.p.y();
         stylus_pose_msg.pose.position.z = stylus_frame.p.z();
-        stylus_pose_msg.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(roll, pitch, yaw);
-        tip_6axis_pose_pub_->publish(stylus_pose_msg);
+        stylus_pose_msg.pose.orientation = quat_msg;
+        tip_6axis_pose_pub->publish(stylus_pose_msg);
     } else {
         RCLCPP_ERROR(this->get_logger(), "Failed to compute forward kinematics for the stylus frame.");
     }
@@ -234,23 +278,12 @@ public:
 
     geometry_msgs::msg::PoseStamped pose_msg;
     pose_msg.header.stamp = now();
-    pose_msg.header.frame_id = reference_frame_;
-    pose_msg.pose.position.x = state->position[0];
-    pose_msg.pose.position.y = state->position[1];
-    pose_msg.pose.position.z = state->position[2];
-
-    tip_5axis_pose_pub_->publish(pose_msg);
-
-
-    // Build the pose msg
-    geometry_msgs::msg::PoseStamped pose_msg;
-    pose_msg.header = state_msg.header;
-    pose_msg.header.frame_id = reference_frame_;
+    pose_msg.header.frame_id = reference_frame;
     pose_msg.pose = state_msg.pose;
-    pose_msg.pose.position.x /= 1000.0;
+    pose_msg.pose.position.x /= 1000.0; 
     pose_msg.pose.position.y /= 1000.0;
     pose_msg.pose.position.z /= 1000.0;
-    tip_6axis_pose_pub_->publish(pose_msg);
+    device_pose_pub->publish(pose_msg);
 
     if ((state->buttons[0] != state->buttons_prev[0])
         or (state->buttons[1] != state->buttons_prev[1]))
@@ -266,7 +299,7 @@ public:
       button_event.white_button = state->buttons[1];
       state->buttons_prev[0] = state->buttons[0];
       state->buttons_prev[1] = state->buttons[1];
-      button_pub_->publish(button_event);
+      button_pub->publish(button_event);
     }
   }  
 };
@@ -275,7 +308,7 @@ HDCallbackCode HDCALLBACK omni_state_callback(void *pUserData)
 {
   OmniState *omni_state = static_cast<OmniState *>(pUserData);
   if (hdCheckCalibration() == HD_CALIBRATION_NEEDS_UPDATE) {
-    RCPCPP_DEBUG(rclcpp::get_logger("omni_state"),"Updating calibration...");
+    RCLCPP_DEBUG(rclcpp::get_logger("omni_state"),"Updating calibration...");
       hdUpdateCalibration(calibrationStyle);
     }
   hdBeginFrame(hdGetCurrentDevice());
@@ -394,19 +427,14 @@ void HHD_Auto_Calibration() {
   }
 }
 
+
+
 void* ros_publish(void* ptr) {
   auto* omni_ros = static_cast<PhantomROS*>(ptr);
-
-  int publish_rate = 1000;
-  if (omni_ros->has_parameter("publish_rate")) {
-    publish_rate = omni_ros->get_parameter("publish_rate").as_int();
-  } else {
-    omni_ros->declare_parameter("publish_rate", 1000);
-  }
-
+  omni_ros->declare_parameter("publish_rate", 1000);
+  int publish_rate = omni_ros->get_parameter("publish_rate").as_int();
   RCLCPP_INFO(omni_ros->get_logger(), "Publishing PHaNTOM state at [%d] Hz", publish_rate);
   rclcpp::Rate loop_rate(publish_rate);
-
   rclcpp::executors::SingleThreadedExecutor executor;
   executor.add_node(omni_ros->shared_from_this());
 
@@ -459,9 +487,13 @@ int main(int argc, char** argv)
     return -1;
   }
 
-  HHD_Auto_Calibration(omni_ros->get_logger());
+  HHD_Auto_Calibration();
+
 
   hdScheduleAsynchronous(omni_state_callback, static_cast<void*>(state.get()), HD_MAX_SCHEDULER_PRIORITY);
+
+
+
 
   pthread_t publish_thread;
   pthread_create(&publish_thread, nullptr, ros_publish, omni_ros.get());
