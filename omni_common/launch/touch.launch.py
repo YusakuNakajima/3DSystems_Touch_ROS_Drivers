@@ -20,14 +20,12 @@ def launch_setup(context, *args, **kwargs):
         get_package_share_directory('omni_description'),
         'urdf/omni.urdf'
     )
-    robot_description = ParameterValue(
-        Command([
-            TextSubstitution(text='cat'),
-            TextSubstitution(text=' '),  # 空白を明示的に入れる
-            TextSubstitution(text=urdf_path)
-        ]),
-        value_type=str
-    )
+    
+    # URDFファイルを直接読み込み
+    with open(urdf_path, 'r') as urdf_file:
+        urdf_content = urdf_file.read()
+    
+    robot_description = ParameterValue(urdf_content, value_type=str)
     
     return [
         # omni_state
@@ -42,8 +40,8 @@ def launch_setup(context, *args, **kwargs):
                 'publish_rate': int(publish_rate),
                 'reference_frame': reference_frame,
                 'units': units,
-                'robot_description': robot_description,
-                # 'robot_description_name': robot_description_name
+                'robot_description_name': f'{prefix}_robot_description',
+                f'{prefix}_robot_description': robot_description,
             }]
         ),
 
@@ -53,12 +51,12 @@ def launch_setup(context, *args, **kwargs):
             executable='robot_state_publisher',
             name=f'{prefix}_robot_state_publisher',
             parameters=[{
-                'robot_description': robot_description 
+                f'{prefix}_robot_description': robot_description 
             }],
-            # remappings=[
-            #     ('/joint_states', f'{prefix}/joint_states'),
-            #     ('/robot_description', robot_description_name)
-            # ]
+            remappings=[
+                ('/joint_states', f'/{prefix}/joint_states'),
+                ('/robot_description', f'/{prefix}_robot_description')
+            ]
         ),
 
         # rviz (別途起動)
