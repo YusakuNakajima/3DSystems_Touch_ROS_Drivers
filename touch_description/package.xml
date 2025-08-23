@@ -1,14 +1,14 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>omni_description</name>
+  <name>touch_description</name>
   <version>0.1.0</version>
-  <description>The omni_description package</description>
+  <description>The touch_description package</description>
 
   <maintainer email="fsuarez6@gmail.com">Francisco Suarez-Ruiz</maintainer>
   <license>BSD</license>
 
-  <url type="website">https://github.com/fsuarez6/phantom_omni</url>
-  <url type="repository">https://github.com/fsuarez6/phantom_omni</url>
+  <url type="website">https://github.com/fsuarez6/phantom_touch</url>
+  <url type="repository">https://github.com/fsuarez6/phantom_touch</url>
 
   <author email="fsuarez6@gmail.com">Francisco Suarez-Ruiz</author>
 

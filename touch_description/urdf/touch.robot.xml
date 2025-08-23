@@ -1,4 +1,4 @@
-<Robot name="omni" file="omni.dae">
+<Robot name="touch" file="touch.dae">
   <Manipulator name="arm">
     <base>base</base>
     <effector>stylus</effector>

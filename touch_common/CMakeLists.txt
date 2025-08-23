@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(omni_common)
+project(touch_common)
 
 # ============================================================
 # 1. Dependencies
@@ -17,10 +17,10 @@ find_package(orocos_kdl REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(urdf REQUIRED)
 
-# Optional: omni_msgs (custom message package)
-find_package(omni_msgs REQUIRED)
+# Optional: touch_msgs (custom message package)
+find_package(touch_msgs REQUIRED)
 
-# Phantom Omni SDK include path (manual search if necessary)
+# Phantom Touch SDK include path (manual search if necessary)
 find_path(OPENHAPTICS_INCLUDE_DIR
   NAMES HD/hd.h HL/hl.h
   PATHS /opt/OpenHaptics/Developer/3.4/include
@@ -40,9 +40,9 @@ include_directories(
 # 2. Sources and Executables
 # ============================================================
 
-# Main node (omni_state)
-add_executable(omni_state src/omni_state.cpp)
-ament_target_dependencies(omni_state
+# Main node (touch_state)
+add_executable(touch_state src/touch_state.cpp)
+ament_target_dependencies(touch_state
   rclcpp
   geometry_msgs
   sensor_msgs
@@ -52,18 +52,18 @@ ament_target_dependencies(omni_state
   tf2_geometry_msgs
   kdl_parser
   orocos_kdl
-  omni_msgs
+  touch_msgs
   urdf
 )
-target_link_libraries(omni_state
+target_link_libraries(touch_state
   HD
   HDU
   pthread
 )
 
-# Optionally another node (omni)
-# add_executable(omni src/omni.cpp)
-# ament_target_dependencies(omni
+# Optionally another node (touch)
+# add_executable(touch src/touch.cpp)
+# ament_target_dependencies(touch
 #   rclcpp
 #   geometry_msgs
 #   sensor_msgs
@@ -73,9 +73,9 @@ target_link_libraries(omni_state
 #   tf2_geometry_msgs
 #   kdl_parser
 #   orocos_kdl
-#   omni_msgs
+#   touch_msgs
 # )
-# target_link_libraries(omni
+# target_link_libraries(touch
 #   HD
 #   HDU
 #   pthread
@@ -89,7 +89,7 @@ install(DIRECTORY launch/
   DESTINATION share/${PROJECT_NAME}/launch
 )
 
-install(TARGETS omni_state 
+install(TARGETS touch_state 
   DESTINATION lib/${PROJECT_NAME}
 )
 

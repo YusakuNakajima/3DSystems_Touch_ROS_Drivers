@@ -1,5 +1,5 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Changelog for package omni_msgs
+Changelog for package touch_msgs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Forthcoming

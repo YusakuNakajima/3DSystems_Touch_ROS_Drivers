@@ -26,16 +26,16 @@
 #define BT_EULER_DEFAULT_ZYX
 #include <bullet/LinearMath/btMatrix3x3.h>
 
-#include "omni_msgs/msg/omni_button_event.hpp"
-#include "omni_msgs/msg/omni_feedback.hpp"
-#include "omni_msgs/msg/omni_state.hpp"
+#include "touch_msgs/msg/touch_button_event.hpp"
+#include "touch_msgs/msg/touch_feedback.hpp"
+#include "touch_msgs/msg/touch_state.hpp"
 #include <pthread.h>
 
 float prev_time;
 int calibrationStyle;
 KDL::Chain kdl_chain_tip, kdl_chain_stylus;
 
-struct OmniState {
+struct TouchState {
   hduVector3Dd position;  //3x1 vector of position
   hduVector3Dd velocity;  //3x1 vector of velocity
   hduVector3Dd inp_vel1;  //3x1 history of velocity used for filtering velocity estimate
@@ -61,21 +61,21 @@ struct OmniState {
 class PhantomROS : public rclcpp::Node {
 
 public:
-  rclcpp::Publisher<omni_msgs::msg::OmniState>::SharedPtr state_publisher;
+  rclcpp::Publisher<touch_msgs::msg::TouchState>::SharedPtr state_publisher;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_publisher;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr tip_pose_publisher;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr stylus_pose_publisher;
-  rclcpp::Publisher<omni_msgs::msg::OmniButtonEvent>::SharedPtr button_publisher;
+  rclcpp::Publisher<touch_msgs::msg::TouchButtonEvent>::SharedPtr button_publisher;
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_publisher;
-  rclcpp::Subscription<omni_msgs::msg::OmniFeedback>::SharedPtr haptic_sub;
+  rclcpp::Subscription<touch_msgs::msg::TouchFeedback>::SharedPtr haptic_sub;
   std::string prefix, ref_frame, units, robot_description_name;
   bool kdl_chains_initialized;
 
-  OmniState *state;
+  TouchState *state;
 
-  PhantomROS() : Node("omni_haptic_node") {}
+  PhantomROS() : Node("touch_haptic_node") {}
 
-  void init(OmniState *s) {
+  void init(TouchState *s) {
     this->declare_parameter("prefix", "phantom");
     this->declare_parameter("reference_frame", "base");
     this->declare_parameter("units", "mm");
@@ -90,19 +90,19 @@ public:
     std::ostringstream stream1;
     stream1 << prefix << "/button";
     std::string button_topic = std::string(stream1.str());
-    button_publisher = this->create_publisher<omni_msgs::msg::OmniButtonEvent>(button_topic.c_str(), 100);
+    button_publisher = this->create_publisher<touch_msgs::msg::TouchButtonEvent>(button_topic.c_str(), 100);
 
     //Publish on NAME/state
     std::ostringstream stream2;
     stream2 << prefix << "/state";
     std::string state_topic_name = std::string(stream2.str());
-    state_publisher = this->create_publisher<omni_msgs::msg::OmniState>(state_topic_name.c_str(), 1);
+    state_publisher = this->create_publisher<touch_msgs::msg::TouchState>(state_topic_name.c_str(), 1);
 
     //Subscribe to NAME/force_feedback
     std::ostringstream stream3;
     stream3 << prefix << "/force_feedback";
     std::string force_feedback_topic = std::string(stream3.str());
-    haptic_sub = this->create_subscription<omni_msgs::msg::OmniFeedback>(
+    haptic_sub = this->create_subscription<touch_msgs::msg::TouchFeedback>(
         force_feedback_topic.c_str(), 1, 
         std::bind(&PhantomROS::force_callback, this, std::placeholders::_1));
 
@@ -208,23 +208,23 @@ public:
   /*******************************************************************************
    ROS node callback.
    *******************************************************************************/
-  void force_callback(const omni_msgs::msg::OmniFeedback::SharedPtr omnifeed) {
+  void force_callback(const touch_msgs::msg::TouchFeedback::SharedPtr touchfeed) {
     ////////////////////Some people might not like this extra damping, but it
     ////////////////////helps to stabilize the overall force feedback. It isn't
     ////////////////////like we are getting direct impedance matching from the
-    ////////////////////omni anyway
-    state->force[0] = omnifeed->force.x - 0.001 * state->velocity[0];
-    state->force[1] = omnifeed->force.y - 0.001 * state->velocity[1];
-    state->force[2] = omnifeed->force.z - 0.001 * state->velocity[2];
+    ////////////////////touch anyway
+    state->force[0] = touchfeed->force.x - 0.001 * state->velocity[0];
+    state->force[1] = touchfeed->force.y - 0.001 * state->velocity[1];
+    state->force[2] = touchfeed->force.z - 0.001 * state->velocity[2];
 
-    state->lock_pos[0] = omnifeed->position.x;
-    state->lock_pos[1] = omnifeed->position.y;
-    state->lock_pos[2] = omnifeed->position.z;
+    state->lock_pos[0] = touchfeed->position.x;
+    state->lock_pos[1] = touchfeed->position.y;
+    state->lock_pos[2] = touchfeed->position.z;
   }
 
-  void publish_omni_state() {
+  void publish_touch_state() {
     // Build the state msg
-    omni_msgs::msg::OmniState state_msg;
+    touch_msgs::msg::TouchState state_msg;
     // Locked
     state_msg.locked = state->lock;
     state_msg.close_gripper = state->close_gripper;
@@ -339,7 +339,7 @@ public:
       if (state->buttons[1] == 1) {
         state->lock = !(state->lock);
       }
-      omni_msgs::msg::OmniButtonEvent button_event;
+      touch_msgs::msg::TouchButtonEvent button_event;
       button_event.grey_button = state->buttons[0];
       button_event.white_button = state->buttons[1];
       state->buttons_prev[0] = state->buttons[0];
@@ -349,9 +349,9 @@ public:
   }
 };
 
-HDCallbackCode HDCALLBACK omni_state_callback(void *pUserData)
+HDCallbackCode HDCALLBACK touch_state_callback(void *pUserData)
 {
-  OmniState *omni_state = static_cast<OmniState *>(pUserData);
+  TouchState *touch_state = static_cast<TouchState *>(pUserData);
   if (hdCheckCalibration() == HD_CALIBRATION_NEEDS_UPDATE) {
     // RCLCPP_DEBUG not available outside class, using printf for now
     printf("Updating calibration...\n");
@@ -362,15 +362,15 @@ HDCallbackCode HDCALLBACK omni_state_callback(void *pUserData)
   hduMatrix transform;
   hduVector3Dd position;
   hdGetDoublev(HD_CURRENT_TRANSFORM, transform);
-  hdGetDoublev(HD_CURRENT_JOINT_ANGLES, omni_state->joints);
+  hdGetDoublev(HD_CURRENT_JOINT_ANGLES, touch_state->joints);
   hdGetDoublev(HD_CURRENT_POSITION, position);
   hduVector3Dd gimbal_angles;
   hdGetDoublev(HD_CURRENT_GIMBAL_ANGLES, gimbal_angles);
   // Notice that we are inverting the Z-position value and changing Y <---> Z
   // Position
-  omni_state->position = hduVector3Dd(transform[3][0], -transform[3][2], transform[3][1]);
-  // omni_state->position = position
-  omni_state->position /= omni_state->units_ratio;
+  touch_state->position = hduVector3Dd(transform[3][0], -transform[3][2], transform[3][1]);
+  // touch_state->position = position
+  touch_state->position /= touch_state->units_ratio;
   // Orientation (quaternion)
   hduMatrix rotation(transform);
   rotation.getRotationMatrix(rotation);
@@ -379,41 +379,41 @@ HDCallbackCode HDCALLBACK omni_state_callback(void *pUserData)
                              0.0,  0.0, 1.0, 0.0,
                              0.0,  0.0, 0.0, 1.0);
   rotation_offset.getRotationMatrix(rotation_offset);
-  omni_state->rot = hduQuaternion(rotation_offset * rotation);
+  touch_state->rot = hduQuaternion(rotation_offset * rotation);
   // Velocity estimation
   hduVector3Dd vel_buff(0, 0, 0);
-  vel_buff = (omni_state->position * 3 - 4 * omni_state->pos_hist1
-      + omni_state->pos_hist2) / 0.002;  //(units)/s, 2nd order backward dif
-  omni_state->velocity = (.2196 * (vel_buff + omni_state->inp_vel3)
-      + .6588 * (omni_state->inp_vel1 + omni_state->inp_vel2)) / 1000.0
-      - (-2.7488 * omni_state->out_vel1 + 2.5282 * omni_state->out_vel2
-          - 0.7776 * omni_state->out_vel3);  //cutoff freq of 20 Hz
-  omni_state->pos_hist2 = omni_state->pos_hist1;
-  omni_state->pos_hist1 = omni_state->position;
-  omni_state->inp_vel3 = omni_state->inp_vel2;
-  omni_state->inp_vel2 = omni_state->inp_vel1;
-  omni_state->inp_vel1 = vel_buff;
-  omni_state->out_vel3 = omni_state->out_vel2;
-  omni_state->out_vel2 = omni_state->out_vel1;
-  omni_state->out_vel1 = omni_state->velocity;
+  vel_buff = (touch_state->position * 3 - 4 * touch_state->pos_hist1
+      + touch_state->pos_hist2) / 0.002;  //(units)/s, 2nd order backward dif
+  touch_state->velocity = (.2196 * (vel_buff + touch_state->inp_vel3)
+      + .6588 * (touch_state->inp_vel1 + touch_state->inp_vel2)) / 1000.0
+      - (-2.7488 * touch_state->out_vel1 + 2.5282 * touch_state->out_vel2
+          - 0.7776 * touch_state->out_vel3);  //cutoff freq of 20 Hz
+  touch_state->pos_hist2 = touch_state->pos_hist1;
+  touch_state->pos_hist1 = touch_state->position;
+  touch_state->inp_vel3 = touch_state->inp_vel2;
+  touch_state->inp_vel2 = touch_state->inp_vel1;
+  touch_state->inp_vel1 = vel_buff;
+  touch_state->out_vel3 = touch_state->out_vel2;
+  touch_state->out_vel2 = touch_state->out_vel1;
+  touch_state->out_vel1 = touch_state->velocity;
 
   //~ // Set forces if locked
-  //~ if (omni_state->lock == true) {
-    //~ omni_state->force = 0.04 * omni_state->units_ratio * (omni_state->lock_pos - omni_state->position)
-        //~ - 0.001 * omni_state->velocity;
+  //~ if (touch_state->lock == true) {
+    //~ touch_state->force = 0.04 * touch_state->units_ratio * (touch_state->lock_pos - touch_state->position)
+        //~ - 0.001 * touch_state->velocity;
   //~ }
   hduVector3Dd feedback;
   // Notice that we are changing Y <---> Z and inverting the Z-force_feedback
-  feedback[0] = omni_state->force[0];
-  feedback[1] = omni_state->force[2];
-  feedback[2] = -omni_state->force[1];
+  feedback[0] = touch_state->force[0];
+  feedback[1] = touch_state->force[2];
+  feedback[2] = -touch_state->force[1];
   hdSetDoublev(HD_CURRENT_FORCE, feedback);
 
   //Get buttons
   int nButtons = 0;
   hdGetIntegerv(HD_CURRENT_BUTTONS, &nButtons);
-  omni_state->buttons[0] = (nButtons & HD_DEVICE_BUTTON_1) ? 1 : 0;
-  omni_state->buttons[1] = (nButtons & HD_DEVICE_BUTTON_2) ? 1 : 0;
+  touch_state->buttons[0] = (nButtons & HD_DEVICE_BUTTON_1) ? 1 : 0;
+  touch_state->buttons[1] = (nButtons & HD_DEVICE_BUTTON_2) ? 1 : 0;
 
   hdEndFrame(hdGetCurrentDevice());
 
@@ -424,11 +424,11 @@ HDCallbackCode HDCALLBACK omni_state_callback(void *pUserData)
       return HD_CALLBACK_DONE;
   }
 
-  float t[7] = { 0.0f, static_cast<float>(omni_state->joints[0]), static_cast<float>(omni_state->joints[1]),
-      static_cast<float>(omni_state->joints[2] - omni_state->joints[1]), static_cast<float>(gimbal_angles[0]),
+  float t[7] = { 0.0f, static_cast<float>(touch_state->joints[0]), static_cast<float>(touch_state->joints[1]),
+      static_cast<float>(touch_state->joints[2] - touch_state->joints[1]), static_cast<float>(gimbal_angles[0]),
       static_cast<float>(gimbal_angles[1]), static_cast<float>(gimbal_angles[2]) };
   for (int i = 0; i < 7; i++)
-    omni_state->thetas[i] = t[i];
+    touch_state->thetas[i] = t[i];
   return HD_CALLBACK_CONTINUE;
 }
 
@@ -477,16 +477,16 @@ void HHD_Auto_Calibration() {
 }
 
 void *ros_publish(void *ptr) {
-  std::shared_ptr<PhantomROS> omni_ros = *static_cast<std::shared_ptr<PhantomROS>*>(ptr);
+  std::shared_ptr<PhantomROS> touch_ros = *static_cast<std::shared_ptr<PhantomROS>*>(ptr);
   int publish_rate;
-  omni_ros->declare_parameter("publish_rate", 1000);
-  publish_rate = omni_ros->get_parameter("publish_rate").as_int();
-  RCLCPP_INFO(omni_ros->get_logger(), "Publishing PHaNTOM state at [%d] Hz", publish_rate);
+  touch_ros->declare_parameter("publish_rate", 1000);
+  publish_rate = touch_ros->get_parameter("publish_rate").as_int();
+  RCLCPP_INFO(touch_ros->get_logger(), "Publishing PHaNTOM state at [%d] Hz", publish_rate);
   rclcpp::Rate loop_rate(publish_rate);
 
   while (rclcpp::ok()) {
-    omni_ros->publish_omni_state();
-    rclcpp::spin_some(omni_ros);
+    touch_ros->publish_touch_state();
+    rclcpp::spin_some(touch_ros);
     loop_rate.sleep();
   }
   return NULL;
@@ -497,8 +497,8 @@ int main(int argc, char** argv) {
   // Init ROS
   ////////////////////////////////////////////////////////////////
   rclcpp::init(argc, argv);
-  OmniState state;
-  auto omni_ros = std::make_shared<PhantomROS>();
+  TouchState state;
+  auto touch_ros = std::make_shared<PhantomROS>();
 
   ////////////////////////////////////////////////////////////////
   // Init Phantom
@@ -508,26 +508,26 @@ int main(int argc, char** argv) {
   // HDstring target_dev = HD_DEFAULT_DEVICE;
   // string dev_string;
   std::string device_name;
-  omni_ros->declare_parameter("device_name", "Default Device");
-  device_name = omni_ros->get_parameter("device_name").as_string();
+  touch_ros->declare_parameter("device_name", "Default Device");
+  device_name = touch_ros->get_parameter("device_name").as_string();
   HDstring target_dev = device_name.c_str();
   hHD = hdInitDevice(target_dev);
   if (HD_DEVICE_ERROR(error = hdGetError())) {
     //hduPrintError(stderr, &error, "Failed to initialize haptic device");
-    RCLCPP_ERROR(omni_ros->get_logger(), "Failed to initialize haptic device"); //: %s", &error);
+    RCLCPP_ERROR(touch_ros->get_logger(), "Failed to initialize haptic device"); //: %s", &error);
     return -1;
   }
-  RCLCPP_INFO(omni_ros->get_logger(), "Found %s.", hdGetString(HD_DEVICE_MODEL_TYPE));
+  RCLCPP_INFO(touch_ros->get_logger(), "Found %s.", hdGetString(HD_DEVICE_MODEL_TYPE));
   hdEnable(HD_FORCE_OUTPUT);
   hdStartScheduler();
   if (HD_DEVICE_ERROR(error = hdGetError())) {
-    RCLCPP_ERROR(omni_ros->get_logger(), "Failed to start the scheduler"); //, &error);
+    RCLCPP_ERROR(touch_ros->get_logger(), "Failed to start the scheduler"); //, &error);
     return -1;
   }
   HHD_Auto_Calibration();
 
-  omni_ros->init(&state);
-  hdScheduleAsynchronous(omni_state_callback, &state,
+  touch_ros->init(&state);
+  hdScheduleAsynchronous(touch_state_callback, &state,
       HD_MAX_SCHEDULER_PRIORITY);
 
   
@@ -535,10 +535,10 @@ int main(int argc, char** argv) {
   // Loop and publish
   ////////////////////////////////////////////////////////////////
   pthread_t publish_thread;
-  pthread_create(&publish_thread, NULL, ros_publish, (void*) &omni_ros);
+  pthread_create(&publish_thread, NULL, ros_publish, (void*) &touch_ros);
   pthread_join(publish_thread, NULL);
 
-  RCLCPP_INFO(omni_ros->get_logger(), "Ending Session....");
+  RCLCPP_INFO(touch_ros->get_logger(), "Ending Session....");
   hdStopScheduler();
   hdDisableDevice(hHD);
 

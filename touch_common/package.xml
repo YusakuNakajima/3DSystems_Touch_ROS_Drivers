@@ -1,15 +1,15 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>omni_common</name>
+  <name>touch_common</name>
   <version>0.1.0</version>
-  <description>ROS 2 Nodes for Sensable Phantom Omni devices.</description>
+  <description>ROS 2 Nodes for Sensable Phantom Touch devices.</description>
 
   <maintainer email="fsuarez6@gmail.com">Francisco Suarez-Ruiz</maintainer>
   <author>Francisco Suarez-Ruiz</author>
   <license>BSD</license>
 
-  <url type="website">https://github.com/fsuarez6/phantom_omni</url>
-  <url type="repository">https://github.com/fsuarez6/phantom_omni</url>
+  <url type="website">https://github.com/fsuarez6/phantom_touch</url>
+  <url type="repository">https://github.com/fsuarez6/phantom_touch</url>
 
   <!-- Build tool -->
   <buildtool_depend>ament_cmake</buildtool_depend>
@@ -24,7 +24,7 @@
   <depend>tf2_geometry_msgs</depend>
   <depend>kdl_parser</depend>
   <depend>orocos_kdl</depend>
-  <depend>omni_msgs</depend>               <!-- Custom messages -->
+  <depend>touch_msgs</depend>               <!-- Custom messages -->
   <depend>robot_state_publisher</depend>   <!-- Optional runtime -->
   <depend>xacro</depend>                   <!-- If URDFs are still used -->
 

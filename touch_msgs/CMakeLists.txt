@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(omni_msgs)
+project(touch_msgs)
 
 # Find ROS 2 packages
 find_package(ament_cmake REQUIRED)
@@ -11,9 +11,9 @@ find_package(std_msgs REQUIRED)
 
 # Message generation
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/OmniFeedback.msg"
-  "msg/OmniButtonEvent.msg"
-  "msg/OmniState.msg"
+  "msg/TouchFeedback.msg"
+  "msg/TouchButtonEvent.msg"
+  "msg/TouchState.msg"
   DEPENDENCIES geometry_msgs sensor_msgs std_msgs
 )
 

@@ -51,9 +51,9 @@ def generate_launch_description():
     robot_description_content = Command([
         FindExecutable(name='cat'), ' ',
         PathJoinSubstitution([
-            FindPackageShare('omni_description'),
+            FindPackageShare('touch_description'),
             'urdf',
-            'omni.urdf'
+            'touch.urdf'
         ])
     ])
 
@@ -74,11 +74,11 @@ def generate_launch_description():
         ]
     )
 
-    # Omni state node
-    omni_state_node = Node(
-        package='omni_common',
-        executable='omni_state',
-        name='omni_state',
+    # Touch state node
+    touch_state_node = Node(
+        package='touch_common',
+        executable='touch_state',
+        name='touch_state',
         output='screen',
         parameters=[{
             'device_name': LaunchConfiguration('device_name'),
@@ -118,7 +118,7 @@ def generate_launch_description():
             executable='rviz2',
             name='rviz',
             arguments=['-d', PathJoinSubstitution([
-                FindPackageShare('omni_common'),
+                FindPackageShare('touch_common'),
                 'launch',
                 'touch.rviz'
             ])],
@@ -135,6 +135,6 @@ def generate_launch_description():
         launch_rviz_arg,
         robot_state_publisher_node,
         robot_description_topic_pub,
-        omni_state_node,
+        touch_state_node,
         rviz_node
     ])

@@ -1,7 +1,7 @@
 3D Systems Touch ROS Driver
 ============
 
-ROS Packages for connecting *one* or *more* 3D Systems Touch (previously known as Phantom Omni or Geomagic Touch) haptic devices, **USB** version.
+ROS Packages for connecting *one* or *more* 3D Systems Touch (previously known as Phantom Touch or Geomagic Touch) haptic devices, **USB** version.
 This repository is forked from the [Geomagic_Touch_ROS_Drivers](https://github.com/bharatm11/Geomagic_Touch_ROS_Drivers) repository.
 
 
@@ -43,7 +43,7 @@ After installing the device driver and building the workspace, you can launch th
 This launch file will start the ROS node and publish the data from the haptic device.
 You can read data from the haptic device and write force feedback to the device.
 ```bash
-roslaunch omni_common touch_state.launch
+roslaunch touch_common touch_state.launch
 ```
 
 Data from the haptic device can be read from the following topics:
@@ -60,12 +60,12 @@ Data from the haptic device can be read from the following topics:
 
 With RViz visualization launch is as follows:
 ```bash
-roslaunch omni_common touch.launch
+roslaunch touch_common touch.launch
 ```
 
 ## Acknowledgements and Citation
 This repository is forked from the [Geomagic_Touch_ROS_Drivers](https://github.com/bharatm11/Geomagic_Touch_ROS_Drivers) repository.
-The original repository by Francisco Suárez Ruiz, [http://fsuarez6.github.io](http://fsuarez6.github.io) for the Sensable PHANToM haptic device (https://github.com/fsuarez6/phantom_omni).
+The original repository by Francisco Suárez Ruiz, [http://fsuarez6.github.io](http://fsuarez6.github.io) for the Sensable PHANToM haptic device (https://github.com/fsuarez6/phantom_touch).
 
 ROS packages developed by the [Group of Robots and Intelligent Machines](http://www.romin.upm.es/) from the [Universidad Politécnica de Madrid](http://www.upm.es/internacional). This group is part of the [Centre for Automation and Robotics](http://www.car.upm-csic.es/) (CAR UPM-CSIC).
 

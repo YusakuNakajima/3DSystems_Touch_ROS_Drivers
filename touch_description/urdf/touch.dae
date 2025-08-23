@@ -11,7 +11,7 @@
 	</asset>
 	<library_visual_scenes id="vscenes">
 		<visual_scene id="vscene" name="URDF Visual Scene">
-			<node id="visual0" name="phantom_omni" sid="visual0">
+			<node id="visual0" name="touch" sid="visual0">
 				<node id="vkmodel0_node0" name="base" sid="node0">
 					<translate>0 -0.02 0</translate>
 					<rotate>1 0 0 0</rotate>
@@ -514,7 +514,7 @@
 		</material>
 	</library_materials>
 	<library_kinematics_models id="kmodels">
-		<kinematics_model id="kmodel0" name="phantom_omni">
+		<kinematics_model id="kmodel0" name="touch">
 			<technique_common>
 				<joint name="elbow" sid="elbow">
 					<revolute sid="axis0">
@@ -852,7 +852,7 @@
 	</library_articulated_systems>
 	<library_kinematics_scenes id="kscenes">
 		<kinematics_scene id="kscene" name="URDF Kinematics Scene">
-			<instance_articulated_system sid="robot0_motion_inst" url="#robot0_motion" name="phantom_omni">
+			<instance_articulated_system sid="robot0_motion_inst" url="#robot0_motion" name="touch">
 				<bind symbol="kscene_kmodel0_inst">
 					<param ref="robot0_motion/robot0_motion_kmodel0_inst"/>
 				</bind>
@@ -912,7 +912,7 @@
 		</physics_scene>
 	</library_physics_scenes>
 	<library_physics_models id="pmodels">
-		<physics_model id="pmodel0" name="phantom_omni">
+		<physics_model id="pmodel0" name="touch">
 			<rigid_body sid="rigid0" name="base">
 				<technique_common/>
 			</rigid_body>

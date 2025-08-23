@@ -1,5 +1,5 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Changelog for package omni_common
+Changelog for package touch_common
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Forthcoming

@@ -5,9 +5,9 @@ usage()
 {
 cat << EOF
 
-usage: rosrun omni_common $FILENAME [options]
+usage: rosrun touch_common $FILENAME [options]
 
-This script compiles (if required) the dummyraw1394 module and insert it in the kernel so we can find the phantom_omni.
+This script compiles (if required) the dummyraw1394 module and insert it in the kernel so we can find the phantom_touch.
 
 OPTIONS:
    -h     Show this message
@@ -32,8 +32,8 @@ while getopts hc opts; do
 done
 
 # Locate the dummyraw1394 folder
-OMNI_PKG=`rospack find omni_common`
-RAW_FOLDER=$OMNI_PKG/dummyraw1394
+TOUCH_PKG=`rospack find touch_common`
+RAW_FOLDER=$TOUCH_PKG/dummyraw1394
 
 if [ $COMPILE = 1 ]; then
   # Compile the dummyraw1394  
@@ -46,7 +46,7 @@ if [[ ! -f $RAW_FOLDER/raw1394.ko ]]; then
   tput setaf 1
   echo "$RAW_FOLDER/raw1394.ko not found"
   tput setaf 4
-  echo "Compile the dummyraw: rosrun omni_common $FILENAME -c"
+  echo "Compile the dummyraw: rosrun touch_common $FILENAME -c"
   tput sgr0
   exit 1
 fi
