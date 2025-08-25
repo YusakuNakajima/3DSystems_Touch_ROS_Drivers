@@ -86,7 +86,6 @@ def generate_launch_description():
             'publish_rate': LaunchConfiguration('publish_rate'),
             'reference_frame': LaunchConfiguration('reference_frame'),
             'units': LaunchConfiguration('units'),
-            'robot_description_name': 'robot_description',
             'robot_description': shared_robot_description
         }]
     )

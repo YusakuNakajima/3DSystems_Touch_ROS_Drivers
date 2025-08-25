@@ -80,6 +80,7 @@ public:
     this->declare_parameter("reference_frame", "base");
     this->declare_parameter("units", "mm");
     this->declare_parameter("robot_description_name", "robot_description");
+    this->declare_parameter("robot_description", "");
 
     prefix = this->get_parameter("prefix").as_string();
     ref_frame = this->get_parameter("reference_frame").as_string();
