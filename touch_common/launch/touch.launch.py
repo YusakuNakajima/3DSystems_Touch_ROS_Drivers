@@ -29,11 +29,6 @@ def generate_launch_description():
         description='Publishing rate in Hz'
     )
     
-    prefix_arg = DeclareLaunchArgument(
-        'prefix',
-        default_value='touch',
-        description='Namespace prefix for topics'
-    )
     
     device_name_arg = DeclareLaunchArgument(
         'device_name',
@@ -68,10 +63,7 @@ def generate_launch_description():
         parameters=[{
             'robot_description': shared_robot_description,
             'publish_frequency': 30.0
-        }],
-        remappings=[
-            ('joint_states', [LaunchConfiguration('prefix'), '/joint_states'])
-        ]
+        }]
     )
 
     # Touch state node
@@ -82,7 +74,6 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             'device_name': LaunchConfiguration('device_name'),
-            'prefix': LaunchConfiguration('prefix'),
             'publish_rate': LaunchConfiguration('publish_rate'),
             'reference_frame': LaunchConfiguration('reference_frame'),
             'units': LaunchConfiguration('units'),
@@ -129,7 +120,6 @@ def generate_launch_description():
         reference_frame_arg,
         units_arg,
         publish_rate_arg,
-        prefix_arg,
         device_name_arg,
         launch_rviz_arg,
         robot_state_publisher_node,

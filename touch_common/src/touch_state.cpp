@@ -68,7 +68,7 @@ public:
   rclcpp::Publisher<touch_msgs::msg::TouchButtonEvent>::SharedPtr button_publisher;
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_publisher;
   rclcpp::Subscription<touch_msgs::msg::TouchFeedback>::SharedPtr haptic_sub;
-  std::string prefix, ref_frame, units, robot_description_name;
+  std::string ref_frame, units, robot_description_name;
   bool kdl_chains_initialized;
 
   TouchState *state;
@@ -76,60 +76,37 @@ public:
   PhantomROS() : Node("touch_haptic_node") {}
 
   void init(TouchState *s) {
-    this->declare_parameter("prefix", "phantom");
     this->declare_parameter("reference_frame", "base");
     this->declare_parameter("units", "mm");
     this->declare_parameter("robot_description_name", "robot_description");
     this->declare_parameter("robot_description", "");
 
-    prefix = this->get_parameter("prefix").as_string();
     ref_frame = this->get_parameter("reference_frame").as_string();
     units = this->get_parameter("units").as_string();
     robot_description_name = this->get_parameter("robot_description_name").as_string();
 
-    //Publish button state on NAME/button
-    std::ostringstream stream1;
-    stream1 << prefix << "/button";
-    std::string button_topic = std::string(stream1.str());
-    button_publisher = this->create_publisher<touch_msgs::msg::TouchButtonEvent>(button_topic.c_str(), 100);
+    //Publish button state on button
+    button_publisher = this->create_publisher<touch_msgs::msg::TouchButtonEvent>("button", 100);
 
-    //Publish on NAME/state
-    std::ostringstream stream2;
-    stream2 << prefix << "/state";
-    std::string state_topic_name = std::string(stream2.str());
-    state_publisher = this->create_publisher<touch_msgs::msg::TouchState>(state_topic_name.c_str(), 1);
+    //Publish on state
+    state_publisher = this->create_publisher<touch_msgs::msg::TouchState>("state", 1);
 
-    //Subscribe to NAME/force_feedback
-    std::ostringstream stream3;
-    stream3 << prefix << "/force_feedback";
-    std::string force_feedback_topic = std::string(stream3.str());
+    //Subscribe to force_feedback
     haptic_sub = this->create_subscription<touch_msgs::msg::TouchFeedback>(
-        force_feedback_topic.c_str(), 1, 
+        "force_feedback", 1, 
         std::bind(&PhantomROS::force_callback, this, std::placeholders::_1));
 
-    //Publish on NAME/pose
-    std::ostringstream stream4;
-    stream4 << prefix << "/pose";
-    std::string pose_topic_name = std::string(stream4.str());
-    pose_publisher = this->create_publisher<geometry_msgs::msg::PoseStamped>(pose_topic_name.c_str(), 1);
+    //Publish on pose
+    pose_publisher = this->create_publisher<geometry_msgs::msg::PoseStamped>("pose", 1);
 
-    //Publish on NAME/joint_states
-    std::ostringstream stream5;
-    stream5 << prefix << "/joint_states";
-    std::string joint_topic_name = std::string(stream5.str());
-    joint_publisher = this->create_publisher<sensor_msgs::msg::JointState>(joint_topic_name.c_str(), 1);
+    //Publish on joint_states
+    joint_publisher = this->create_publisher<sensor_msgs::msg::JointState>("joint_states", 1);
 
-    //Publish on NAME/tip_pose
-    std::ostringstream stream6;
-    stream6 << prefix << "/tip_pose";
-    std::string tip_pose_topic_name = std::string(stream6.str());
-    tip_pose_publisher = this->create_publisher<geometry_msgs::msg::PoseStamped>(tip_pose_topic_name.c_str(), 1);
+    //Publish on tip_pose
+    tip_pose_publisher = this->create_publisher<geometry_msgs::msg::PoseStamped>("tip_pose", 1);
 
-    //Publish on NAME/stylus_pose
-    std::ostringstream stream7;
-    stream7 << prefix << "/stylus_pose";
-    std::string stylus_pose_topic_name = std::string(stream7.str());
-    stylus_pose_publisher = this->create_publisher<geometry_msgs::msg::PoseStamped>(stylus_pose_topic_name.c_str(), 1);
+    //Publish on stylus_pose
+    stylus_pose_publisher = this->create_publisher<geometry_msgs::msg::PoseStamped>("stylus_pose", 1);
 
     // Try to get the robot description from the parameter server (optional)
     kdl_chains_initialized = false;
@@ -150,12 +127,12 @@ public:
             KDL::Tree kdl_tree;
             if (kdl_parser::treeFromString(robot_description_content, kdl_tree)) {
                 // Get the chain 
-                if (kdl_tree.getChain(prefix + "_base", prefix + "_tip", kdl_chain_tip) &&
-                    kdl_tree.getChain(prefix + "_base", prefix + "_stylus", kdl_chain_stylus)) {
+                if (kdl_tree.getChain("touch_base", "touch_tip", kdl_chain_tip) &&
+                    kdl_tree.getChain("touch_base", "touch_stylus", kdl_chain_stylus)) {
                     kdl_chains_initialized = true;
                     RCLCPP_INFO(this->get_logger(), "KDL chains initialized successfully.");
                 } else {
-                    RCLCPP_WARN(this->get_logger(), "Failed to get KDL chains from %s_base to %s_tip/%s_stylus.", prefix.c_str(), prefix.c_str(), prefix.c_str());
+                    RCLCPP_WARN(this->get_logger(), "Failed to get KDL chains from touch_base to touch_tip/touch_stylus.");
                 }
             } else {
                 RCLCPP_WARN(this->get_logger(), "Failed to parse URDF to KDL tree.");
