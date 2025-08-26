@@ -12,14 +12,9 @@
 		<color rgba="1.0 1.0 1.0 1.0" />
 	</material>
 
-  <!-- World -->
-  <link name="world" />
-
-  <joint name="world_to_base" type="fixed">
-    <parent link="world" />
-    <child link="touch_base" />
-    <origin xyz="0 0 0" rpy="0 0 0" />
-  </joint>
+  <!-- Note: Removed world link and world_to_base joint -->
+  <!-- touch_base is now the root frame for this robot description -->
+  <!-- External transforms (world -> touch_base) should be handled by static_transform_publisher -->
 	
 	<!-- Links -->
   <link name="touch_base" >
