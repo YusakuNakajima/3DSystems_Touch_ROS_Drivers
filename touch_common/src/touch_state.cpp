@@ -14,6 +14,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include <cmath>
 #include <assert.h>
 #include <sstream>
 
@@ -191,13 +192,20 @@ public:
     ////////////////////helps to stabilize the overall force feedback. It isn't
     ////////////////////like we are getting direct impedance matching from the
     ////////////////////touch anyway
-    state->force[0] = touchfeed->force.x - 0.001 * state->velocity[0];
-    state->force[1] = touchfeed->force.y - 0.001 * state->velocity[1];
-    state->force[2] = touchfeed->force.z - 0.001 * state->velocity[2];
+    
+    // Replace NaN values with 0.0 for force
+    double force_x = std::isnan(touchfeed->force.x) ? 0.0 : touchfeed->force.x;
+    double force_y = std::isnan(touchfeed->force.y) ? 0.0 : touchfeed->force.y;
+    double force_z = std::isnan(touchfeed->force.z) ? 0.0 : touchfeed->force.z;
+    
+    state->force[0] = force_x - 0.001 * state->velocity[0];
+    state->force[1] = force_y - 0.001 * state->velocity[1];
+    state->force[2] = force_z - 0.001 * state->velocity[2];
 
-    state->lock_pos[0] = touchfeed->position.x;
-    state->lock_pos[1] = touchfeed->position.y;
-    state->lock_pos[2] = touchfeed->position.z;
+    // Replace NaN values with 0.0 for position
+    state->lock_pos[0] = std::isnan(touchfeed->position.x) ? 0.0 : touchfeed->position.x;
+    state->lock_pos[1] = std::isnan(touchfeed->position.y) ? 0.0 : touchfeed->position.y;
+    state->lock_pos[2] = std::isnan(touchfeed->position.z) ? 0.0 : touchfeed->position.z;
   }
 
   void publish_touch_state() {
