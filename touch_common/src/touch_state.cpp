@@ -17,6 +17,8 @@
 #include <cmath>
 #include <assert.h>
 #include <sstream>
+#include <signal.h>
+#include <atomic>
 
 #include <HL/hl.h>
 #include <HD/hd.h>
@@ -35,6 +37,10 @@
 float prev_time;
 int calibrationStyle;
 KDL::Chain kdl_chain_tip, kdl_chain_stylus;
+
+// Global shutdown flag for clean exit
+std::atomic<bool> g_shutdown_requested(false);
+HHD g_hHD = HD_INVALID_HANDLE;
 
 struct TouchState {
   hduVector3Dd position;  //3x1 vector of position
@@ -462,6 +468,17 @@ void HHD_Auto_Calibration() {
   }
 }
 
+// Signal handler for clean shutdown
+void signal_handler(int signal) {
+  if (signal == SIGINT) {
+    printf("\nReceived SIGINT, shutting down gracefully...\n");
+    g_shutdown_requested.store(true);
+    
+    // Stop ROS spinning
+    rclcpp::shutdown();
+  }
+}
+
 void *ros_publish(void *ptr) {
   std::shared_ptr<TouchROS> touch_ros = *static_cast<std::shared_ptr<TouchROS>*>(ptr);
   int publish_rate;
@@ -470,7 +487,7 @@ void *ros_publish(void *ptr) {
   RCLCPP_INFO(touch_ros->get_logger(), "Publishing Touch state at [%d] Hz", publish_rate);
   rclcpp::Rate loop_rate(publish_rate);
 
-  while (rclcpp::ok()) {
+  while (rclcpp::ok() && !g_shutdown_requested.load()) {
     touch_ros->publish_touch_state();
     rclcpp::spin_some(touch_ros);
     loop_rate.sleep();
@@ -478,7 +495,31 @@ void *ros_publish(void *ptr) {
   return NULL;
 }
 
+// Clean shutdown function
+void cleanup_resources() {
+  printf("Cleaning up resources...\n");
+  
+  // Stop haptic device scheduler
+  if (g_hHD != HD_INVALID_HANDLE) {
+    hdStopScheduler();
+    hdDisableDevice(g_hHD);
+    printf("Haptic device stopped and disabled.\n");
+  }
+  
+  // Shutdown ROS if not already done
+  if (rclcpp::ok()) {
+    rclcpp::shutdown();
+  }
+  
+  printf("Cleanup completed.\n");
+}
+
 int main(int argc, char** argv) {
+  ////////////////////////////////////////////////////////////////
+  // Setup signal handler for clean shutdown
+  ////////////////////////////////////////////////////////////////
+  signal(SIGINT, signal_handler);
+  
   ////////////////////////////////////////////////////////////////
   // Init ROS
   ////////////////////////////////////////////////////////////////
@@ -490,24 +531,22 @@ int main(int argc, char** argv) {
   // Init Touch
   ////////////////////////////////////////////////////////////////
   HDErrorInfo error;
-  HHD hHD;
-  // HDstring target_dev = HD_DEFAULT_DEVICE;
-  // string dev_string;
   std::string device_name;
   touch_ros->declare_parameter("device_name", "Default Device");
   device_name = touch_ros->get_parameter("device_name").as_string();
   HDstring target_dev = device_name.c_str();
-  hHD = hdInitDevice(target_dev);
+  g_hHD = hdInitDevice(target_dev);
   if (HD_DEVICE_ERROR(error = hdGetError())) {
-    //hduPrintError(stderr, &error, "Failed to initialize haptic device");
-    RCLCPP_ERROR(touch_ros->get_logger(), "Failed to initialize haptic device"); //: %s", &error);
+    RCLCPP_ERROR(touch_ros->get_logger(), "Failed to initialize haptic device");
+    cleanup_resources();
     return -1;
   }
   RCLCPP_INFO(touch_ros->get_logger(), "Found %s.", hdGetString(HD_DEVICE_MODEL_TYPE));
   hdEnable(HD_FORCE_OUTPUT);
   hdStartScheduler();
   if (HD_DEVICE_ERROR(error = hdGetError())) {
-    RCLCPP_ERROR(touch_ros->get_logger(), "Failed to start the scheduler"); //, &error);
+    RCLCPP_ERROR(touch_ros->get_logger(), "Failed to start the scheduler");
+    cleanup_resources();
     return -1;
   }
   HHD_Auto_Calibration();
@@ -522,12 +561,16 @@ int main(int argc, char** argv) {
   ////////////////////////////////////////////////////////////////
   pthread_t publish_thread;
   pthread_create(&publish_thread, NULL, ros_publish, (void*) &touch_ros);
+  
+  // Wait for shutdown signal or thread completion
   pthread_join(publish_thread, NULL);
 
   RCLCPP_INFO(touch_ros->get_logger(), "Ending Session....");
-  hdStopScheduler();
-  hdDisableDevice(hHD);
-
-  rclcpp::shutdown();
+  
+  ////////////////////////////////////////////////////////////////
+  // Clean shutdown
+  ////////////////////////////////////////////////////////////////
+  cleanup_resources();
+  
   return 0;
 }
