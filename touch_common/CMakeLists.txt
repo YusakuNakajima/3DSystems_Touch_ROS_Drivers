@@ -6,6 +6,7 @@ project(touch_common)
 # ============================================================
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -40,10 +41,11 @@ include_directories(
 # 2. Sources and Executables
 # ============================================================
 
-# Main node (touch_state)
-add_executable(touch_state src/touch_state.cpp)
-ament_target_dependencies(touch_state
+# Component library
+add_library(touch_state_component SHARED src/touch_state.cpp)
+ament_target_dependencies(touch_state_component
   rclcpp
+  rclcpp_components
   geometry_msgs
   sensor_msgs
   std_msgs
@@ -55,10 +57,16 @@ ament_target_dependencies(touch_state
   touch_msgs
   urdf
 )
-target_link_libraries(touch_state
+target_link_libraries(touch_state_component
   HD
   HDU
   pthread
+)
+
+# Register component
+rclcpp_components_register_node(touch_state_component
+  PLUGIN "TouchROS"
+  EXECUTABLE touch_state
 )
 
 # Optionally another node (touch)
@@ -87,6 +95,13 @@ target_link_libraries(touch_state
 # ============================================================
 install(DIRECTORY launch/
   DESTINATION share/${PROJECT_NAME}/launch
+)
+
+install(TARGETS
+  touch_state_component
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
 )
 
 install(TARGETS touch_state 

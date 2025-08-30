@@ -1,4 +1,5 @@
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp_components/register_node_macro.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/wrench.hpp>
 #include <geometry_msgs/msg/wrench_stamped.hpp>
@@ -34,13 +35,8 @@
 #include "touch_msgs/msg/touch_state.hpp"
 #include <pthread.h>
 
-float prev_time;
-int calibrationStyle;
-KDL::Chain kdl_chain_tip, kdl_chain_stylus;
-
-// Global shutdown flag for clean exit
-std::atomic<bool> g_shutdown_requested(false);
-HHD g_hHD = HD_INVALID_HANDLE;
+// Forward declarations
+HDCallbackCode HDCALLBACK touch_state_callback(void *pUserData);
 
 struct TouchState {
   hduVector3Dd position;  //3x1 vector of position
@@ -68,6 +64,7 @@ struct TouchState {
 class TouchROS : public rclcpp::Node {
 
 public:
+  // Publishers and subscribers
   rclcpp::Publisher<touch_msgs::msg::TouchState>::SharedPtr state_publisher;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_publisher;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr tip_pose_publisher;
@@ -75,14 +72,55 @@ public:
   rclcpp::Publisher<touch_msgs::msg::TouchButtonEvent>::SharedPtr button_publisher;
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_publisher;
   rclcpp::Subscription<touch_msgs::msg::TouchFeedback>::SharedPtr haptic_sub;
+  
+  // Configuration parameters
   std::string ref_frame, units, robot_description_name;
   bool kdl_chains_initialized;
 
+  // Touch state and hardware
   TouchState *state;
+  
+  // Member variables formerly global
+  float prev_time;
+  int calibrationStyle;
+  KDL::Chain kdl_chain_tip, kdl_chain_stylus;
+  std::atomic<bool> shutdown_requested;
+  HHD hHD;
+  
+  // Publishing thread
+  pthread_t publish_thread;
+  rclcpp::TimerBase::SharedPtr publish_timer;
 
-  TouchROS() : Node("touch_haptic_node") {}
+  TouchROS(const rclcpp::NodeOptions & options = rclcpp::NodeOptions()) 
+    : Node("touch_haptic_node", options), 
+      shutdown_requested(false),
+      hHD(HD_INVALID_HANDLE) {
+    initialize();
+  }
 
-  void init(TouchState *s) {
+  void initialize() {
+    // Initialize touch state
+    state = new TouchState();
+    init_touch_state();
+    
+    // Initialize haptic device
+    init_haptic_device();
+    
+    // Start publishing
+    start_publishing();
+  }
+
+public:
+  ~TouchROS() {
+    cleanup_resources();
+    if (state) {
+      delete state;
+    }
+  }
+
+private:
+
+  void init_touch_state() {
     this->declare_parameter("reference_frame", "base");
     this->declare_parameter("units", "mm");
     this->declare_parameter("robot_description_name", "robot_description");
@@ -155,7 +193,7 @@ public:
         RCLCPP_WARN(this->get_logger(), "KDL chains not initialized. Tip and stylus pose publishing will be disabled.");
     }
 
-    state = s;
+    // state is already allocated in initialize()
     state->buttons[0] = 0;
     state->buttons[1] = 0;
     state->buttons_prev[0] = 0;
@@ -190,9 +228,66 @@ public:
     RCLCPP_INFO(this->get_logger(), "Touch position given in [%s], ratio [%.1f]", units.c_str(), state->units_ratio);
   }
 
+  void init_haptic_device() {
+    HDErrorInfo error;
+    std::string device_name;
+    this->declare_parameter("device_name", "Default Device");
+    device_name = this->get_parameter("device_name").as_string();
+    HDstring target_dev = device_name.c_str();
+    hHD = hdInitDevice(target_dev);
+    if (HD_DEVICE_ERROR(error = hdGetError())) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to initialize haptic device");
+      cleanup_resources();
+      throw std::runtime_error("Failed to initialize haptic device");
+    }
+    RCLCPP_INFO(this->get_logger(), "Found %s.", hdGetString(HD_DEVICE_MODEL_TYPE));
+    hdEnable(HD_FORCE_OUTPUT);
+    hdStartScheduler();
+    if (HD_DEVICE_ERROR(error = hdGetError())) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to start the scheduler");
+      cleanup_resources();
+      throw std::runtime_error("Failed to start the scheduler");
+    }
+    HHD_Auto_Calibration();
+    
+    hdScheduleAsynchronous(touch_state_callback, state, HD_MAX_SCHEDULER_PRIORITY);
+  }
+
+  void start_publishing() {
+    int publish_rate;
+    this->declare_parameter("publish_rate", 1000);
+    publish_rate = this->get_parameter("publish_rate").as_int();
+    RCLCPP_INFO(this->get_logger(), "Publishing Touch state at [%d] Hz", publish_rate);
+    
+    publish_timer = this->create_wall_timer(
+        std::chrono::milliseconds(1000 / publish_rate),
+        std::bind(&TouchROS::publish_touch_state, this)
+    );
+  }
+
+  void cleanup_resources() {
+    RCLCPP_INFO(this->get_logger(), "Cleaning up resources...");
+    
+    shutdown_requested.store(true);
+    
+    if (publish_timer) {
+      publish_timer->cancel();
+    }
+    
+    // Stop haptic device scheduler
+    if (hHD != HD_INVALID_HANDLE) {
+      hdStopScheduler();
+      hdDisableDevice(hHD);
+      RCLCPP_INFO(this->get_logger(), "Haptic device stopped and disabled.");
+    }
+    
+    RCLCPP_INFO(this->get_logger(), "Cleanup completed.");
+  }
+
   /*******************************************************************************
    ROS node callback.
    *******************************************************************************/
+public:
   void force_callback(const touch_msgs::msg::TouchFeedback::SharedPtr touchfeed) {
     ////////////////////Some people might not like this extra damping, but it
     ////////////////////helps to stabilize the overall force feedback. It isn't
@@ -339,6 +434,51 @@ public:
       button_publisher->publish(button_event);
     }
   }
+
+  /*******************************************************************************
+   Automatic Calibration of Touch Device - No character inputs
+   *******************************************************************************/
+private:
+  void HHD_Auto_Calibration() {
+    int supportedCalibrationStyles;
+    HDErrorInfo error;
+
+    hdGetIntegerv(HD_CALIBRATION_STYLE, &supportedCalibrationStyles);
+    if (supportedCalibrationStyles & HD_CALIBRATION_ENCODER_RESET) {
+      calibrationStyle = HD_CALIBRATION_ENCODER_RESET;
+      RCLCPP_INFO(this->get_logger(), "HD_CALIBRATION_ENCODER_RESET..");
+    }
+    if (supportedCalibrationStyles & HD_CALIBRATION_INKWELL) {
+      calibrationStyle = HD_CALIBRATION_INKWELL;
+      RCLCPP_INFO(this->get_logger(), "HD_CALIBRATION_INKWELL..");
+    }
+    if (supportedCalibrationStyles & HD_CALIBRATION_AUTO) {
+      calibrationStyle = HD_CALIBRATION_AUTO;
+      RCLCPP_INFO(this->get_logger(), "HD_CALIBRATION_AUTO..");
+    }
+    if (calibrationStyle == HD_CALIBRATION_ENCODER_RESET) {
+      do {
+        hdUpdateCalibration(calibrationStyle);
+        RCLCPP_INFO(this->get_logger(), "Calibrating.. (put stylus in well)");
+        if (HD_DEVICE_ERROR(error = hdGetError())) {
+          RCLCPP_ERROR(this->get_logger(), "Reset encoders reset failed.");
+          break;
+        }
+      } while (hdCheckCalibration() != HD_CALIBRATION_OK);
+      RCLCPP_INFO(this->get_logger(), "Calibration complete.");
+    }
+    while(hdCheckCalibration() != HD_CALIBRATION_OK) {
+      usleep(1e6);
+      if (hdCheckCalibration() == HD_CALIBRATION_NEEDS_MANUAL_INPUT)
+        RCLCPP_INFO(this->get_logger(), "Please place the device into the inkwell for calibration");
+      else if (hdCheckCalibration() == HD_CALIBRATION_NEEDS_UPDATE) {
+        RCLCPP_INFO(this->get_logger(), "Calibration updated successfully");
+        hdUpdateCalibration(calibrationStyle);
+      }
+      else
+        RCLCPP_WARN(this->get_logger(), "Unknown calibration status");
+    }
+  }
 };
 
 HDCallbackCode HDCALLBACK touch_state_callback(void *pUserData)
@@ -347,7 +487,7 @@ HDCallbackCode HDCALLBACK touch_state_callback(void *pUserData)
   if (hdCheckCalibration() == HD_CALIBRATION_NEEDS_UPDATE) {
     // RCLCPP_DEBUG not available outside class, using printf for now
     printf("Updating calibration...\n");
-      hdUpdateCalibration(calibrationStyle);
+      hdUpdateCalibration(HD_CALIBRATION_AUTO);
     }
   hdBeginFrame(hdGetCurrentDevice());
   // Get transform and angles
@@ -424,153 +564,5 @@ HDCallbackCode HDCALLBACK touch_state_callback(void *pUserData)
   return HD_CALLBACK_CONTINUE;
 }
 
-/*******************************************************************************
- Automatic Calibration of Touch Device - No character inputs
- *******************************************************************************/
-void HHD_Auto_Calibration() {
-  int supportedCalibrationStyles;
-  HDErrorInfo error;
-
-  hdGetIntegerv(HD_CALIBRATION_STYLE, &supportedCalibrationStyles);
-  if (supportedCalibrationStyles & HD_CALIBRATION_ENCODER_RESET) {
-    calibrationStyle = HD_CALIBRATION_ENCODER_RESET;
-    printf("HD_CALIBRATION_ENCODER_RESET..\n");
-  }
-  if (supportedCalibrationStyles & HD_CALIBRATION_INKWELL) {
-    calibrationStyle = HD_CALIBRATION_INKWELL;
-    printf("HD_CALIBRATION_INKWELL..\n");
-  }
-  if (supportedCalibrationStyles & HD_CALIBRATION_AUTO) {
-    calibrationStyle = HD_CALIBRATION_AUTO;
-    printf("HD_CALIBRATION_AUTO..\n");
-  }
-  if (calibrationStyle == HD_CALIBRATION_ENCODER_RESET) {
-    do {
-      hdUpdateCalibration(calibrationStyle);
-      printf("Calibrating.. (put stylus in well)\n");
-      if (HD_DEVICE_ERROR(error = hdGetError())) {
-        hduPrintError(stderr, &error, "Reset encoders reset failed.");
-        break;
-      }
-    } while (hdCheckCalibration() != HD_CALIBRATION_OK);
-    printf("Calibration complete.\n");
-  }
-  while(hdCheckCalibration() != HD_CALIBRATION_OK) {
-    usleep(1e6);
-    if (hdCheckCalibration() == HD_CALIBRATION_NEEDS_MANUAL_INPUT)
-      printf("Please place the device into the inkwell for calibration\n");
-    else if (hdCheckCalibration() == HD_CALIBRATION_NEEDS_UPDATE) {
-      printf("Calibration updated successfully\n");
-      hdUpdateCalibration(calibrationStyle);
-    }
-    else
-      printf("Unknown calibration status\n");
-  }
-}
-
-// Signal handler for clean shutdown
-void signal_handler(int signal) {
-  if (signal == SIGINT) {
-    printf("\nReceived SIGINT, shutting down gracefully...\n");
-    g_shutdown_requested.store(true);
-    
-    // Stop ROS spinning
-    rclcpp::shutdown();
-  }
-}
-
-void *ros_publish(void *ptr) {
-  std::shared_ptr<TouchROS> touch_ros = *static_cast<std::shared_ptr<TouchROS>*>(ptr);
-  int publish_rate;
-  touch_ros->declare_parameter("publish_rate", 1000);
-  publish_rate = touch_ros->get_parameter("publish_rate").as_int();
-  RCLCPP_INFO(touch_ros->get_logger(), "Publishing Touch state at [%d] Hz", publish_rate);
-  rclcpp::Rate loop_rate(publish_rate);
-
-  while (rclcpp::ok() && !g_shutdown_requested.load()) {
-    touch_ros->publish_touch_state();
-    rclcpp::spin_some(touch_ros);
-    loop_rate.sleep();
-  }
-  return NULL;
-}
-
-// Clean shutdown function
-void cleanup_resources() {
-  printf("Cleaning up resources...\n");
-  
-  // Stop haptic device scheduler
-  if (g_hHD != HD_INVALID_HANDLE) {
-    hdStopScheduler();
-    hdDisableDevice(g_hHD);
-    printf("Haptic device stopped and disabled.\n");
-  }
-  
-  // Shutdown ROS if not already done
-  if (rclcpp::ok()) {
-    rclcpp::shutdown();
-  }
-  
-  printf("Cleanup completed.\n");
-}
-
-int main(int argc, char** argv) {
-  ////////////////////////////////////////////////////////////////
-  // Setup signal handler for clean shutdown
-  ////////////////////////////////////////////////////////////////
-  signal(SIGINT, signal_handler);
-  
-  ////////////////////////////////////////////////////////////////
-  // Init ROS
-  ////////////////////////////////////////////////////////////////
-  rclcpp::init(argc, argv);
-  TouchState state;
-  auto touch_ros = std::make_shared<TouchROS>();
-
-  ////////////////////////////////////////////////////////////////
-  // Init Touch
-  ////////////////////////////////////////////////////////////////
-  HDErrorInfo error;
-  std::string device_name;
-  touch_ros->declare_parameter("device_name", "Default Device");
-  device_name = touch_ros->get_parameter("device_name").as_string();
-  HDstring target_dev = device_name.c_str();
-  g_hHD = hdInitDevice(target_dev);
-  if (HD_DEVICE_ERROR(error = hdGetError())) {
-    RCLCPP_ERROR(touch_ros->get_logger(), "Failed to initialize haptic device");
-    cleanup_resources();
-    return -1;
-  }
-  RCLCPP_INFO(touch_ros->get_logger(), "Found %s.", hdGetString(HD_DEVICE_MODEL_TYPE));
-  hdEnable(HD_FORCE_OUTPUT);
-  hdStartScheduler();
-  if (HD_DEVICE_ERROR(error = hdGetError())) {
-    RCLCPP_ERROR(touch_ros->get_logger(), "Failed to start the scheduler");
-    cleanup_resources();
-    return -1;
-  }
-  HHD_Auto_Calibration();
-
-  touch_ros->init(&state);
-  hdScheduleAsynchronous(touch_state_callback, &state,
-      HD_MAX_SCHEDULER_PRIORITY);
-
-  
-  ////////////////////////////////////////////////////////////////
-  // Loop and publish
-  ////////////////////////////////////////////////////////////////
-  pthread_t publish_thread;
-  pthread_create(&publish_thread, NULL, ros_publish, (void*) &touch_ros);
-  
-  // Wait for shutdown signal or thread completion
-  pthread_join(publish_thread, NULL);
-
-  RCLCPP_INFO(touch_ros->get_logger(), "Ending Session....");
-  
-  ////////////////////////////////////////////////////////////////
-  // Clean shutdown
-  ////////////////////////////////////////////////////////////////
-  cleanup_resources();
-  
-  return 0;
-}
+// Component registration
+RCLCPP_COMPONENTS_REGISTER_NODE(TouchROS)
