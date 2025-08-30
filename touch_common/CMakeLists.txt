@@ -20,7 +20,7 @@ find_package(urdf REQUIRED)
 # Optional: touch_msgs (custom message package)
 find_package(touch_msgs REQUIRED)
 
-# Phantom Touch SDK include path (manual search if necessary)
+# Touch SDK include path (manual search if necessary)
 find_path(OPENHAPTICS_INCLUDE_DIR
   NAMES HD/hd.h HL/hl.h
   PATHS /opt/OpenHaptics/Developer/3.4/include

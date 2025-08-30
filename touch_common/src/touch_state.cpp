@@ -59,7 +59,7 @@ struct TouchState {
   double units_ratio;
 };
 
-class PhantomROS : public rclcpp::Node {
+class TouchROS : public rclcpp::Node {
 
 public:
   rclcpp::Publisher<touch_msgs::msg::TouchState>::SharedPtr state_publisher;
@@ -74,7 +74,7 @@ public:
 
   TouchState *state;
 
-  PhantomROS() : Node("touch_haptic_node") {}
+  TouchROS() : Node("touch_haptic_node") {}
 
   void init(TouchState *s) {
     this->declare_parameter("reference_frame", "base");
@@ -95,7 +95,7 @@ public:
     //Subscribe to force_feedback
     haptic_sub = this->create_subscription<touch_msgs::msg::TouchFeedback>(
         "force_feedback", 1, 
-        std::bind(&PhantomROS::force_callback, this, std::placeholders::_1));
+        std::bind(&TouchROS::force_callback, this, std::placeholders::_1));
 
     //Publish on pose
     pose_publisher = this->create_publisher<geometry_msgs::msg::PoseStamped>("pose", 1);
@@ -181,7 +181,7 @@ public:
       RCLCPP_WARN(this->get_logger(), "Unknown units [%s] using [mm]", units.c_str());
       units = "mm";
     }
-    RCLCPP_INFO(this->get_logger(), "PHaNTOM position given in [%s], ratio [%.1f]", units.c_str(), state->units_ratio);
+    RCLCPP_INFO(this->get_logger(), "Touch position given in [%s], ratio [%.1f]", units.c_str(), state->units_ratio);
   }
 
   /*******************************************************************************
@@ -419,7 +419,7 @@ HDCallbackCode HDCALLBACK touch_state_callback(void *pUserData)
 }
 
 /*******************************************************************************
- Automatic Calibration of Phantom Device - No character inputs
+ Automatic Calibration of Touch Device - No character inputs
  *******************************************************************************/
 void HHD_Auto_Calibration() {
   int supportedCalibrationStyles;
@@ -463,11 +463,11 @@ void HHD_Auto_Calibration() {
 }
 
 void *ros_publish(void *ptr) {
-  std::shared_ptr<PhantomROS> touch_ros = *static_cast<std::shared_ptr<PhantomROS>*>(ptr);
+  std::shared_ptr<TouchROS> touch_ros = *static_cast<std::shared_ptr<TouchROS>*>(ptr);
   int publish_rate;
   touch_ros->declare_parameter("publish_rate", 1000);
   publish_rate = touch_ros->get_parameter("publish_rate").as_int();
-  RCLCPP_INFO(touch_ros->get_logger(), "Publishing PHaNTOM state at [%d] Hz", publish_rate);
+  RCLCPP_INFO(touch_ros->get_logger(), "Publishing Touch state at [%d] Hz", publish_rate);
   rclcpp::Rate loop_rate(publish_rate);
 
   while (rclcpp::ok()) {
@@ -484,10 +484,10 @@ int main(int argc, char** argv) {
   ////////////////////////////////////////////////////////////////
   rclcpp::init(argc, argv);
   TouchState state;
-  auto touch_ros = std::make_shared<PhantomROS>();
+  auto touch_ros = std::make_shared<TouchROS>();
 
   ////////////////////////////////////////////////////////////////
-  // Init Phantom
+  // Init Touch
   ////////////////////////////////////////////////////////////////
   HDErrorInfo error;
   HHD hHD;

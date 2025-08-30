@@ -37,7 +37,7 @@ You can test the connection of the device by responding to the prompt:
 ./checkup_Touch_device.sh
 ```
 
-## Launch ROS Node
+## Launch ROS Nodephantom
 
 After installing the device driver and building the workspace, you can launch the ROS node.
 This launch file will start the ROS node and publish the data from the haptic device.
@@ -48,15 +48,15 @@ roslaunch touch_common touch_state.launch
 
 Data from the haptic device can be read from the following topics:
 
-  /phantom/button
+  /touch/button
   
-  /phantom/force_feedback
+  /touch/force_feedback
   
-  /phantom/joint_states
+  /touch/joint_states
   
-  /phantom/pose
+  /touch/pose
   
-  /phantom/state
+  /touch/state
 
 With RViz visualization launch is as follows:
 ```bash
