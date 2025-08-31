@@ -52,6 +52,7 @@ struct TouchState {
   hduQuaternion rot;
   hduVector3Dd joints;
   hduVector3Dd force;   //3 element double vector force[0], force[1], force[2]
+  hduVector3Dd force_from_user; // Force received from the user topic
   float thetas[7];
   int buttons[2];
   int buttons_prev[2];
@@ -289,21 +290,12 @@ private:
    *******************************************************************************/
 public:
   void force_callback(const touch_msgs::msg::TouchFeedback::SharedPtr touchfeed) {
-    ////////////////////Some people might not like this extra damping, but it
-    ////////////////////helps to stabilize the overall force feedback. It isn't
-    ////////////////////like we are getting direct impedance matching from the
-    ////////////////////touch anyway
-    
-    // Replace NaN values with 0.0 for force
-    double force_x = std::isnan(touchfeed->force.x) ? 0.0 : touchfeed->force.x;
-    double force_y = std::isnan(touchfeed->force.y) ? 0.0 : touchfeed->force.y;
-    double force_z = std::isnan(touchfeed->force.z) ? 0.0 : touchfeed->force.z;
-    
-    state->force[0] = force_x - 0.001 * state->velocity[0];
-    state->force[1] = force_y - 0.001 * state->velocity[1];
-    state->force[2] = force_z - 0.001 * state->velocity[2];
+    // Simply store the received force from the user. Damping will be applied in the haptic thread.
+    state->force_from_user[0] = std::isnan(touchfeed->force.x) ? 0.0 : touchfeed->force.x;
+    state->force_from_user[1] = std::isnan(touchfeed->force.y) ? 0.0 : touchfeed->force.y;
+    state->force_from_user[2] = std::isnan(touchfeed->force.z) ? 0.0 : touchfeed->force.z;
 
-    // Replace NaN values with 0.0 for position
+    // We still need to handle the lock position from the feedback message
     state->lock_pos[0] = std::isnan(touchfeed->position.x) ? 0.0 : touchfeed->position.x;
     state->lock_pos[1] = std::isnan(touchfeed->position.y) ? 0.0 : touchfeed->position.y;
     state->lock_pos[2] = std::isnan(touchfeed->position.z) ? 0.0 : touchfeed->position.z;
@@ -529,11 +521,11 @@ HDCallbackCode HDCALLBACK touch_state_callback(void *pUserData)
   touch_state->out_vel2 = touch_state->out_vel1;
   touch_state->out_vel1 = touch_state->velocity;
 
-  //~ // Set forces if locked
-  //~ if (touch_state->lock == true) {
-    //~ touch_state->force = 0.04 * touch_state->units_ratio * (touch_state->lock_pos - touch_state->position)
-        //~ - 0.001 * touch_state->velocity;
-  //~ }
+  // Apply damping to the user-provided force in the haptic thread
+  touch_state->force[0] = touch_state->force_from_user[0] - 0.001 * touch_state->velocity[0];
+  touch_state->force[1] = touch_state->force_from_user[1] - 0.001 * touch_state->velocity[1];
+  touch_state->force[2] = touch_state->force_from_user[2] - 0.001 * touch_state->velocity[2];
+
   hduVector3Dd feedback;
   // Notice that we are changing Y <---> Z and inverting the Z-force_feedback
   feedback[0] = touch_state->force[0];
