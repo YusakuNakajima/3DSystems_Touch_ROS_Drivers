@@ -25,6 +25,7 @@
   <depend>tf2_geometry_msgs</depend>
   <depend>kdl_parser</depend>
   <depend>touch_msgs</depend>               <!-- Custom messages -->
+  <depend>touch_description</depend>
   <depend>robot_state_publisher</depend>   <!-- Optional runtime -->
   <depend>xacro</depend>                   <!-- If URDFs are still used -->
 
